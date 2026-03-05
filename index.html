@@ -164,26 +164,8 @@
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m6-4v4m-12-4v4M3 9h18M3 17h18"/></svg>
         GitHub Setup
       </button>
-      <button class="btn-file active" onclick="fileOpen()" title="Open an existing fuel-log.json file">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        Open JSON
-      </button>
-      <button class="btn-file" id="btnSaveAs" onclick="fileSaveAs()" title="Save a copy / link a new file">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save As
-      </button>
-      <button class="btn-file" onclick="fileExport()" title="Download a copy as JSON">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Export
-      </button>
-      <button class="btn-file" onclick="fileImport()" title="Import from a JSON file (replaces current data)">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Import
-      </button>
     </div>
   </div>
-<!-- hidden input for import fallback -->
-<input type="file" id="importInput" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)" />
 
 <main>
   <div class="summary-grid">

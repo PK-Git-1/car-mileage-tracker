@@ -12,8 +12,6 @@ function getGitHubToken() { return localStorage.getItem('gh_token') || ''; }
 function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 /* ===================== FILE SYSTEM ===================== */
-let fileHandle = null;
-const FSA = typeof window.showOpenFilePicker === 'function';
 
 async function commitToGitHub(data) {
   const token = getGitHubToken();
@@ -78,24 +76,6 @@ async function commitToGitHub(data) {
 function persistData(d) {
   saveData(d);
   commitToGitHub(d);
-  if (fileHandle) {
-    writeFileHandle(d).catch(err => console.error('File write error:', err));
-  }
-}
-
-async function writeFileHandle(d) {
-  const writable = await fileHandle.createWritable();
-  await writable.write(JSON.stringify(d, null, 2));
-  await writable.close();
-}
-
-function setFileLinked(name) {
-  fileHandle && (document.getElementById('fileDot').className = 'file-dot linked');
-  const fn = document.getElementById('fileName');
-  fn.textContent = name;
-  fn.className = 'file-name linked';
-  document.getElementById('btnSaveAs').innerHTML =
-    '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save As';
 }
 
 let siTimer;
@@ -105,77 +85,6 @@ function setSaveIndicator(state) {
   if (state === 'saving') { el.className = 'save-indicator saving'; el.textContent = '● saving…'; }
   else if (state === 'saved') { el.className = 'save-indicator saved'; el.textContent = '✔ saved'; siTimer = setTimeout(() => { el.textContent = ''; el.className = 'save-indicator'; }, 2500); }
   else { el.className = 'save-indicator'; el.textContent = ''; }
-}
-
-async function fileOpen() {
-  if (FSA) {
-    try {
-      [fileHandle] = await window.showOpenFilePicker({
-        types: [{ description: 'Fuel Log JSON', accept: { 'application/json': ['.json'] } }], multiple: false
-      });
-      const file = await fileHandle.getFile();
-      const parsed = JSON.parse(await file.text());
-      if (!Array.isArray(parsed)) throw new Error('JSON must be an array of entries.');
-      data = parsed;
-      saveData(data);
-      setFileLinked(file.name);
-      render();
-      showToast('Opened: ' + file.name, 'success');
-    } catch(e) { if (e.name !== 'AbortError') showToast(e.message || 'Could not open file.', 'error'); }
-  } else {
-    fileImport();
-  }
-}
-
-async function fileSaveAs() {
-  if (FSA) {
-    try {
-      fileHandle = await window.showSaveFilePicker({
-        suggestedName: 'fuel-log.json',
-        types: [{ description: 'Fuel Log JSON', accept: { 'application/json': ['.json'] } }]
-      });
-      await writeFileHandle(data);
-      const file = await fileHandle.getFile();
-      setFileLinked(file.name);
-      showToast('Saved as: ' + file.name, 'success');
-    } catch(e) { if (e.name !== 'AbortError') fileExport(); }
-  } else {
-    fileExport();
-  }
-}
-
-function fileExport() {
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'fuel-log.json';
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(a.href);
-  showToast('Exported fuel-log.json', 'success');
-}
-
-function fileImport() {
-  document.getElementById('importInput').value = '';
-  document.getElementById('importInput').click();
-}
-
-function handleImportFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    try {
-      const parsed = JSON.parse(ev.target.result);
-      if (!Array.isArray(parsed)) throw new Error('JSON must be an array of entries.');
-      data = parsed;
-      saveData(data);
-      render();
-      showToast('Imported ' + data.length + ' entries from ' + file.name, 'success');
-    } catch(err) { showToast('Invalid JSON: ' + err.message, 'error'); }
-  };
-  reader.readAsText(file);
 }
 
 /* ===================== DATA LOADING ===================== */
@@ -217,7 +126,6 @@ async function loadFromGitHub() {
         data = parsed;
         saveData(data);
         console.log('Loaded from GitHub');
-        setFileLinked('fuel-log.json (GitHub Auto-Save)');
         return true;
       }
     }
