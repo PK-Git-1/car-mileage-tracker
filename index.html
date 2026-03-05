@@ -359,6 +359,39 @@
         Save Token
       </button>
     </div>
+</div>
+
+<!-- GITHUB LOGIN REQUIRED MODAL -->
+<div class="overlay" id="ghLoginRequiredOverlay" onclick="overlayClick(event,'ghLoginRequiredOverlay')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">GitHub Authentication Required</div>
+      <button class="modal-close" onclick="closeGitHubLoginRequired()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div style="text-align: center; padding: 20px 0;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" style="margin: 0 auto 16px;">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: var(--text);">Token Expired or Invalid</div>
+        <div style="font-size: 0.83rem; color: var(--text-muted); margin-bottom: 20px;">Your GitHub token has expired. Please update it to continue auto-saving.</div>
+      </div>
+      
+      <div class="field form-full">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="gh_login_token_input" placeholder="Paste your new GitHub token here" />
+        <span class="helper">Get a new token at: <a href="https://github.com/settings/tokens" target="_blank" style="color: var(--primary);">github.com/settings/tokens</a></span>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeGitHubLoginRequired()">Later</button>
+      <button class="btn btn-primary" onclick="saveGitHubLoginToken()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Update Token
+      </button>
+    </div>
   </div>
 </div>
 

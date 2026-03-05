@@ -29,6 +29,14 @@ async function commitToGitHub(data) {
       { headers: { 'Authorization': `token ${token}` } }
     );
     
+    // Check for authentication errors
+    if (getRes.status === 401) {
+      setSaveIndicator('');
+      showToast('GitHub token expired or invalid. Please update your token.', 'error');
+      showGitHubLoginRequired();
+      return;
+    }
+    
     let sha = null;
     if (getRes.ok) {
       const fileData = await getRes.json();
@@ -58,6 +66,13 @@ async function commitToGitHub(data) {
         body: JSON.stringify(payload)
       }
     );
+    
+    if (putRes.status === 401) {
+      setSaveIndicator('');
+      showToast('GitHub token expired or invalid. Please update your token.', 'error');
+      showGitHubLoginRequired();
+      return;
+    }
     
     if (putRes.ok) {
       setSaveIndicator('saved');
@@ -117,6 +132,13 @@ async function loadFromGitHub() {
       `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json?ref=${GITHUB_BRANCH}`,
       { headers: { 'Authorization': `token ${token}` } }
     );
+    
+    if (response.status === 401) {
+      console.log('GitHub token expired or invalid');
+      localStorage.removeItem('gh_token');
+      showGitHubLoginRequired();
+      return false;
+    }
     
     if (response.ok) {
       const fileData = await response.json();
@@ -487,7 +509,7 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubSetup(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubSetup(); closeGitHubLoginRequired(); } });
 
 /* ===================== GITHUB SETUP ===================== */
 function showGitHubSetup() {
@@ -510,6 +532,28 @@ function saveGitHubToken() {
   closeGitHubSetup();
   showToast('GitHub token saved! Changes will now auto-save.', 'success');
   location.reload(); // Reload to apply token
+}
+
+/* ===================== GITHUB LOGIN REQUIRED ===================== */
+function showGitHubLoginRequired() {
+  document.getElementById('gh_login_token_input').value = '';
+  document.getElementById('ghLoginRequiredOverlay').classList.add('open');
+}
+
+function closeGitHubLoginRequired() {
+  document.getElementById('ghLoginRequiredOverlay').classList.remove('open');
+}
+
+function saveGitHubLoginToken() {
+  const token = document.getElementById('gh_login_token_input').value.trim();
+  if (!token) {
+    showToast('Token cannot be empty', 'error');
+    return;
+  }
+  localStorage.setItem('gh_token', token);
+  closeGitHubLoginRequired();
+  showToast('GitHub token updated! Trying again...', 'success');
+  location.reload(); // Reload to apply new token
 }
 
 // Initialize on DOM ready
