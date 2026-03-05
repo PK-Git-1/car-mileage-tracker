@@ -2,92 +2,16 @@
 
 /* ===================== STORAGE ===================== */
 const STORE_KEY = 'carMileageTracker_v2';
-const GITHUB_OWNER = 'pk-git-1';
-const GITHUB_REPO = 'punchu';
-const GITHUB_BRANCH = 'main';
+const AUTH_KEY = 'carMileageTracker_auth';
 
 function loadData()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || null; } catch { return null; } }
 function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
-function getGitHubToken() { return localStorage.getItem('gh_token') || ''; }
+function getUsername() { return localStorage.getItem(AUTH_KEY) || ''; }
 function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 /* ===================== FILE SYSTEM ===================== */
 
-async function commitToGitHub(data) {
-  const token = getGitHubToken();
-  if (!token) {
-    console.log('GitHub token not set, skipping auto-commit');
-    return;
-  }
-  
-  try {
-    setSaveIndicator('saving');
-    
-    // Get current file SHA (needed for update)
-    const getRes = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json?ref=${GITHUB_BRANCH}`,
-      { headers: { 'Authorization': `token ${token}` } }
-    );
-    
-    // Check for authentication errors
-    if (getRes.status === 401) {
-      setSaveIndicator('');
-      showToast('GitHub token expired or invalid. Please update your token.', 'error');
-      showGitHubLoginRequired();
-      return;
-    }
-    
-    let sha = null;
-    if (getRes.ok) {
-      const fileData = await getRes.json();
-      sha = fileData.sha;
-    }
-    
-    // Prepare commit
-    const content = btoa(JSON.stringify(data, null, 2)); // Base64 encode
-    const message = `Update fuel log: ${new Date().toLocaleString()}`;
-    
-    const payload = {
-      message,
-      content,
-      branch: GITHUB_BRANCH,
-      ...(sha && { sha }) // Include SHA if updating existing file
-    };
-    
-    // Commit to GitHub
-    const putRes = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json`,
-      {
-        method: 'PUT',
-        headers: {
-          'Authorization': `token ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
-      }
-    );
-    
-    if (putRes.status === 401) {
-      setSaveIndicator('');
-      showToast('GitHub token expired or invalid. Please update your token.', 'error');
-      showGitHubLoginRequired();
-      return;
-    }
-    
-    if (putRes.ok) {
-      setSaveIndicator('saved');
-      console.log('Saved to GitHub');
-    } else {
-      const err = await putRes.json();
-      throw new Error(err.message || 'GitHub commit failed');
-    }
-  } catch (err) {
-    setSaveIndicator('');
-    showToast('GitHub save failed: ' + err.message, 'error');
-    console.error('GitHub commit error:', err);
-  }
-}
-
+// Data persistence is now only via localStorage (no GitHub sync)
 function persistData(d) {
   saveData(d);
   commitToGitHub(d);
@@ -123,66 +47,20 @@ async function loadFromFile() {
   return false;
 }
 
-async function loadFromGitHub() {
-  const token = getGitHubToken();
-  if (!token) return false;
-  
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json?ref=${GITHUB_BRANCH}`,
-      { headers: { 'Authorization': `token ${token}` } }
-    );
-    
-    if (response.status === 401) {
-      console.log('GitHub token expired or invalid');
-      localStorage.removeItem('gh_token');
-      showGitHubLoginRequired();
-      return false;
-    }
-    
-    if (response.ok) {
-      const fileData = await response.json();
-      const content = atob(fileData.content); // Decode base64
-      const parsed = JSON.parse(content);
-      if (Array.isArray(parsed)) {
-        data = parsed;
-        saveData(data);
-        console.log('Loaded from GitHub');
-        return true;
-      }
-    }
-  } catch (err) {
-    console.log('GitHub load failed:', err.message);
-  }
-  return false;
-}
-
 async function initializeData() {
-  // Try loading from GitHub first (if token is set)
-  const loadedGH = await loadFromGitHub();
-  
-  if (!loadedGH) {
-    // Fall back to local file
-    const loaded = await loadFromFile();
-    
-    if (!loaded) {
-      // Fall back to browser storage
-      const stored = loadData();
-      if (stored) {
-        data = stored;
-        console.log('Loaded from browser storage');
-      } else {
-        // Start with empty data
-        data = [];
-        saveData(data);
-        console.log('Starting with empty data');
-      }
-    }
+  // Load from localStorage
+  const stored = loadData();
+  if (stored && Array.isArray(stored)) {
+    data = stored;
+    console.log('Loaded from browser storage');
+  } else {
+    // Start with empty data
+    data = [];
+    saveData(data);
+    console.log('Starting with empty data');
   }
   render();
 }
-
-// Note: file handle cannot be restored across page reloads (browser security).
 
 /* ===================== SORT ===================== */
 let sortKey = 'date', sortAsc = false;
@@ -509,48 +387,30 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubLoginRequired(); } });
-
-/* ===================== GITHUB LOGIN REQUIRED ===================== */
-function showGitHubLoginRequired() {
-  document.getElementById('gh_login_token_input').value = '';
-  document.getElementById('ghLoginRequiredOverlay').classList.add('open');
-}
-
-function closeGitHubLoginRequired() {
-  document.getElementById('ghLoginRequiredOverlay').classList.remove('open');
-}
-
-function saveGitHubLoginToken() {
-  const token = document.getElementById('gh_login_token_input').value.trim();
-  if (!token) {
-    showToast('Token cannot be empty', 'error');
-    return;
-  }
-  localStorage.setItem('gh_token', token);
-  closeGitHubLoginRequired();
-  showToast('GitHub token updated! Trying again...', 'success');
-  location.reload(); // Reload to apply new token
-}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); } });
 
 // Initialize on DOM ready
 function checkLoginScreen() {
-  const hasToken = getGitHubToken();
-  const hasSeenLogin = localStorage.getItem('loginScreenSeen');
+  const username = getUsername();
   
-  // Show login screen only if first visit or no token set
-  if (!hasSeenLogin && !hasToken) {
+  // Always show login screen if not logged in
+  if (!username) {
     showLoginScreen();
   } else {
     hideLoginScreen();
+    showMainContent();
     initializeData();
   }
 }
 
 function showLoginScreen() {
   const loginScreen = document.getElementById('loginScreen');
+  const mainContent = document.getElementById('mainContent');
   if (loginScreen) {
     loginScreen.classList.remove('hidden');
+  }
+  if (mainContent) {
+    mainContent.style.display = 'none';
   }
 }
 
@@ -561,31 +421,52 @@ function hideLoginScreen() {
   }
 }
 
-function skipGitHubLogin() {
-  localStorage.setItem('loginScreenSeen', 'true');
-  hideLoginScreen();
-  initializeData();
-  showToast('You can add GitHub token later through the authentication modal.', 'success');
+function showMainContent() {
+  const mainContent = document.getElementById('mainContent');
+  if (mainContent) {
+    mainContent.style.display = 'block';
+  }
 }
 
-function submitInitialLogin() {
-  const tokenInput = document.getElementById('loginTokenInput');
-  const token = tokenInput.value.trim();
+function logout() {
+  if (confirm('Are you sure you want to logout?')) {
+    localStorage.removeItem(AUTH_KEY);
+    showToast('Logged out successfully', 'success');
+    setTimeout(() => {
+      location.reload();
+    }, 1000);
+  }
+}
+
+function submitLogin() {
+  const username = document.getElementById('loginUsername').value.trim();
+  const password = document.getElementById('loginPassword').value.trim();
   
-  if (!token) {
-    showToast('Please enter a GitHub token', 'error');
+  if (!username) {
+    showToast('Please enter a username', 'error');
     return;
   }
   
-  if (token.length < 20) {
-    showToast('Token seems invalid. Please check and try again.', 'error');
+  if (!password) {
+    showToast('Please enter a password', 'error');
     return;
   }
   
-  localStorage.setItem('gh_token', token);
-  localStorage.setItem('loginScreenSeen', 'true');
+  if (username.length < 3) {
+    showToast('Username must be at least 3 characters', 'error');
+    return;
+  }
+  
+  if (password.length < 4) {
+    showToast('Password must be at least 4 characters', 'error');
+    return;
+  }
+  
+  // Store username in localStorage (password not stored for security)
+  localStorage.setItem(AUTH_KEY, username);
   hideLoginScreen();
-  showToast('GitHub token saved! Initializing...', 'success');
+  showMainContent();
+  showToast('Welcome ' + username + '!', 'success');
   initializeData();
 }
 

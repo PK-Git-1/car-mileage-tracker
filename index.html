@@ -151,13 +151,19 @@
     Car Mileage Tracker
     <span class="header-meta">Fuel Log</span>
   </div>
-  <button class="btn btn-primary" onclick="openAdd()">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-    Add Entry
-  </button>
+  <div style="display: flex; gap: 8px; align-items: center;">
+    <button class="btn btn-primary" onclick="openAdd()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+      Add Entry
+    </button>
+    <button class="btn btn-cancel" onclick="logout()" style="min-height: 44px; padding: 10px 14px;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 16l4-4m0 0l-4-4m4 4H7m0 0a4 4 0 01-4-4V5a4 4 0 014-4h4m0 16v4m0-16V3"/></svg>
+      Logout
+    </button>
+  </div>
 </header>
 
-<main>
+<main id="mainContent" style="display: none;">
   <div class="summary-grid">
     <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value blue" id="sumEntries">0</div><div class="stat-sub">records</div></div>
     <div class="stat-card"><div class="stat-label">Total Spent</div><div class="stat-value" id="sumAmount">&#8377;0</div><div class="stat-sub">on fuel</div></div>
@@ -318,40 +324,6 @@
   </div>
 </div>
 
-<!-- GITHUB LOGIN REQUIRED MODAL -->
-<div class="overlay" id="ghLoginRequiredOverlay" onclick="overlayClick(event,'ghLoginRequiredOverlay')">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">GitHub Authentication Required</div>
-      <button class="modal-close" onclick="closeGitHubLoginRequired()">&#x2715;</button>
-    </div>
-    <div class="modal-body">
-      <div style="text-align: center; padding: 20px 0;">
-        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" style="margin: 0 auto 16px;">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <div style="font-size: 0.95rem; font-weight: 700; margin-bottom: 8px; color: var(--text);">Token Expired or Invalid</div>
-        <div style="font-size: 0.83rem; color: var(--text-muted); margin-bottom: 20px;">Your GitHub token has expired. Please update it to continue auto-saving.</div>
-      </div>
-      
-      <div class="field form-full">
-        <label>GitHub Personal Access Token</label>
-        <input type="password" id="gh_login_token_input" placeholder="Paste your new GitHub token here" />
-        <span class="helper">Get a new token at: <a href="https://github.com/settings/tokens" target="_blank" style="color: var(--primary);">github.com/settings/tokens</a></span>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" onclick="closeGitHubLoginRequired()">Later</button>
-      <button class="btn btn-primary" onclick="saveGitHubLoginToken()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Update Token
-      </button>
-    </div>
-  </div>
-</div>
-
 <div class="toast" id="toast"></div>
 
 <!-- INITIAL LOGIN SCREEN -->
@@ -364,19 +336,22 @@
       </svg>
     </div>
     <div class="login-title">Car Mileage Tracker</div>
-    <div class="login-subtitle">Track your fuel consumption and mileage with ease. Auto-sync to GitHub for backup.</div>
+    <div class="login-subtitle">Track your fuel consumption and mileage. Sign in to access your data.</div>
     
     <div class="login-field">
-      <label>GitHub Personal Access Token</label>
-      <input type="password" id="loginTokenInput" placeholder="Paste your GitHub token" />
-      <span class="login-helper">Get a new token at: <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></span>
+      <label>Username</label>
+      <input type="text" id="loginUsername" placeholder="Enter your username" />
+    </div>
+
+    <div class="login-field">
+      <label>Password</label>
+      <input type="password" id="loginPassword" placeholder="Enter your password" />
     </div>
     
     <div class="login-actions">
-      <button class="btn btn-cancel login-skip" onclick="skipGitHubLogin()">Skip for Now</button>
-      <button class="btn btn-primary" onclick="submitInitialLogin()">
+      <button class="btn btn-primary" onclick="submitLogin()" style="flex: 1;">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        Set Token & Continue
+        Login
       </button>
     </div>
   </div>
