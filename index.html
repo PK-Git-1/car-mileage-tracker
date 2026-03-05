@@ -1,0 +1,350 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Fuel Log" />
+  <title>Car Mileage Tracker</title>
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231e293b' width='180' height='180'/><text x='90' y='90' font-size='80' fill='%2360a5fa' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>⛽</text></svg>" />
+  <style>
+    :root {
+      --primary: #2563eb; --primary-dark: #1d4ed8; --primary-light: #eff6ff;
+      --danger: #dc2626; --danger-light: #fef2f2;
+      --success: #16a34a; --success-light: #f0fdf4;
+      --warning: #d97706;
+      --bg: #f8fafc; --card: #ffffff; --border: #e2e8f0;
+      --text: #0f172a; --text-muted: #64748b; --text-light: #94a3b8;
+      --header-bg: #1e293b; --radius: 10px;
+      --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    body, html { width: 100%; overflow-x: hidden; }
+    header { background: var(--header-bg); color: #fff; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); padding-top: max(0px, env(safe-area-inset-top)); }
+    .header-brand { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 700; white-space: nowrap; }
+    .header-meta { font-size: 0.70rem; color: #94a3b8; font-weight: 400; display: none; }
+    main { max-width: 1440px; margin: 16px auto; padding: 0 12px 80px; padding-bottom: max(80px, calc(12px + env(safe-area-inset-bottom))); }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 18px; }
+    .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; box-shadow: var(--shadow); }
+    .stat-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--text-muted); margin-bottom: 4px; }
+    .stat-value { font-size: 1.35rem; font-weight: 700; color: var(--text); line-height: 1; }
+    .stat-value.blue { color: var(--primary); } .stat-value.green { color: var(--success); } .stat-value.amber { color: var(--warning); }
+    .stat-sub { font-size: 0.68rem; color: var(--text-light); margin-top: 3px; }
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 11px; }
+    .section-title { font-size: 1rem; font-weight: 700; }
+    .section-title span { font-size: 0.78rem; font-weight: 500; color: var(--text-muted); margin-left: 6px; }
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 7px; border: none; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: background 0.15s, transform 0.1s; min-height: 44px; -webkit-user-select: none; user-select: none; }
+    .btn:active { transform: scale(0.97); }
+    .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+    .btn-primary:hover { background: var(--primary-dark); }
+    .btn-icon-edit { background: var(--primary-light); color: var(--primary); min-height: 36px; min-width: 36px; }
+    .btn-icon-edit:hover { background: #dbeafe; }
+    .btn-icon-del { background: var(--danger-light); color: var(--danger); min-height: 36px; min-width: 36px; }
+    .btn-icon-del:hover { background: #fee2e2; }
+    .btn-sm { padding: 6px 10px; font-size: 0.73rem; border-radius: 6px; min-height: 36px; }
+    .btn-cancel { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
+    .btn-cancel:hover { background: var(--border); }
+    .btn-danger { background: var(--danger); color: #fff; box-shadow: 0 2px 6px rgba(220,38,38,0.3); }
+    .btn-danger:hover { background: #b91c1c; }
+    .table-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    thead tr { background: #f1f5f9; border-bottom: 2px solid var(--border); }
+    thead th { padding: 10px 8px; text-align: left; font-size: 0.60rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); white-space: nowrap; cursor: pointer; user-select: none; -webkit-user-select: none; }
+    thead th:hover { color: var(--primary); }
+    thead th:last-child { cursor: default; }
+    thead th:last-child:hover { color: var(--text-muted); }
+    thead th .sort-icon { opacity: 0.35; margin-left: 2px; font-size: 0.55rem; }
+    thead th.sorted .sort-icon { opacity: 1; color: var(--primary); }
+    tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f8fafc; }
+    td { padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
+    .bunk-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.76rem; }
+    .date-str { font-weight: 600; } .dow { font-size: 0.60rem; color: var(--text-muted); margin-top: 1px; }
+    .num { font-variant-numeric: tabular-nums; }
+    .badge { display: inline-block; padding: 2px 6px; border-radius: 20px; font-size: 0.63rem; font-weight: 700; }
+    .badge-green { background: var(--success-light); color: var(--success); }
+    .badge-blue  { background: var(--primary-light);  color: var(--primary); }
+    .badge-amber { background: #fffbeb;               color: var(--warning); }
+    .badge-red   { background: var(--danger-light);   color: var(--danger); }
+    .actions { display: flex; gap: 6px; }
+    .overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 200; align-items: center; justify-content: center; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+    .overlay.open { display: flex; }
+    .modal { background: var(--card); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); width: 100%; max-width: 540px; max-height: 90vh; overflow-y: auto; animation: slideUp 0.22s ease; -webkit-overflow-scrolling: touch; }
+    @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 18px 12px; border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--card); border-radius: 14px 14px 0 0; z-index: 1; }
+    .modal-title { font-size: 0.95rem; font-weight: 700; }
+    .modal-close { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; background: var(--bg); border-radius: 7px; cursor: pointer; font-size: 1rem; color: var(--text-muted); min-height: 44px; min-width: 44px; }
+    .modal-close:hover { background: var(--border); color: var(--text); }
+    .modal-body { padding: 16px 18px; }
+    .modal-footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding-bottom: max(12px, calc(12px + env(safe-area-inset-bottom))); }
+    .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .form-full { grid-column: 1 / -1; }
+    .field { display: flex; flex-direction: column; gap: 4px; }
+    .field label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
+    .field input, .field select { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; -webkit-border-radius: 7px; }
+    .field input:focus, .field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .field .helper { font-size: 0.62rem; color: var(--text-light); }
+    .divider { grid-column: 1/-1; border: none; border-top: 1px dashed var(--border); margin: 2px 0; }
+    .section-lbl { grid-column: 1/-1; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
+    .section-lbl::after { content: ""; flex: 1; border-top: 1px solid var(--primary-light); }
+    .calc-chip { display: flex; align-items: center; gap: 8px; background: var(--primary-light); border: 1px solid #bfdbfe; border-radius: 7px; padding: 9px 12px; }
+    .calc-chip .cl { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; color: #93c5fd; }
+    .calc-chip .cv { font-size: 0.9rem; font-weight: 700; color: var(--primary); }
+    .confirm-modal { background: var(--card); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); width: 100%; max-width: 360px; padding: 28px 28px 22px; text-align: center; animation: slideUp 0.2s ease; }
+    .confirm-icon { width: 52px; height: 52px; background: var(--danger-light); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
+    .confirm-title { font-size: 1rem; font-weight: 700; margin-bottom: 6px; }
+    .confirm-msg { font-size: 0.83rem; color: var(--text-muted); margin-bottom: 20px; }
+    .confirm-actions { display: flex; gap: 10px; justify-content: center; }
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--header-bg); color: #fff; padding: 11px 16px; border-radius: 10px; font-size: 0.82rem; font-weight: 500; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 999; transform: translateY(80px); opacity: 0; transition: transform 0.3s ease, opacity 0.3s ease; display: flex; align-items: center; gap: 8px; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-left: 4px solid var(--success); }
+    .toast.error   { border-left: 4px solid var(--danger); }
+    .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    .empty-state p { font-size: 0.9rem; margin-bottom: 16px; }
+    /* ── FILE BAR ── */
+    .file-bar { background: #0f172a; border-bottom: 1px solid #1e293b; padding: 8px 12px; min-height: 44px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: max(8px, env(safe-area-inset-top)); }
+    .file-status { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
+    .file-dot { width: 8px; height: 8px; border-radius: 50%; background: #475569; flex-shrink: 0; }
+    .file-dot.linked { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
+    .file-name { font-size: 0.68rem; color: #94a3b8; font-family: 'Courier New', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+    .file-name.linked { color: #e2e8f0; }
+    .file-actions { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
+    .btn-file { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border-radius: 5px; border: 1px solid #334155; background: transparent; color: #94a3b8; font-size: 0.66rem; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; min-height: 32px; -webkit-user-select: none; user-select: none; }
+    .btn-file:hover { background: #1e293b; color: #e2e8f0; }
+    .btn-file.active { border-color: #2563eb; color: #93c5fd; }
+    .btn-file.active:hover { background: #1e3a5f; }
+    .save-indicator { font-size: 0.62rem; color: #64748b; margin-left: 2px; transition: color 0.3s; }
+    .save-indicator.saving { color: #fbbf24; }
+    .save-indicator.saved  { color: #4ade80; }
+    @media (max-width: 768px) { 
+      .form-grid { grid-template-columns: 1fr; } 
+      .summary-grid { grid-template-columns: repeat(2, 1fr); } 
+      main { padding: 0 12px 80px; }
+      .file-name { max-width: 120px; }
+      .header-meta { display: none; }
+    }
+    @media (max-width: 480px) {
+      .summary-grid { grid-template-columns: 1fr; }
+      table { font-size: 0.7rem; }
+      .bunk-cell { max-width: 100px; }
+      .modal { max-height: 95vh; }
+      .file-actions { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-brand">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/>
+      <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+    </svg>
+    Car Mileage Tracker
+    <span class="header-meta">Fuel Log</span>
+  </div>
+  <button class="btn btn-primary" onclick="openAdd()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    Add Entry
+  </button>
+</header>
+
+<!-- FILE BAR -->
+<div class="file-bar">
+  <div class="file-status">
+    <div class="file-dot" id="fileDot"></div>
+    <span class="file-name" id="fileName">No file linked &mdash; using browser storage</span>
+    <span class="save-indicator" id="saveIndicator"></span>
+  </div>
+  <div class="file-actions">
+    <button class="btn-file active" onclick="fileOpen()" title="Open an existing fuel-log.json file">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+      Open JSON
+    </button>
+    <button class="btn-file" id="btnSaveAs" onclick="fileSaveAs()" title="Save a copy / link a new file">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+      Save As
+    </button>
+    <button class="btn-file" onclick="fileExport()" title="Download a copy as JSON">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <button class="btn-file" onclick="fileImport()" title="Import from a JSON file (replaces current data)">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Import
+    </button>
+  </div>
+</div>
+<!-- hidden input for import fallback -->
+<input type="file" id="importInput" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)" />
+
+<main>
+  <div class="summary-grid">
+    <div class="stat-card"><div class="stat-label">Entries</div><div class="stat-value blue" id="sumEntries">0</div><div class="stat-sub">records</div></div>
+    <div class="stat-card"><div class="stat-label">Total Spent</div><div class="stat-value" id="sumAmount">&#8377;0</div><div class="stat-sub">on fuel</div></div>
+    <div class="stat-card"><div class="stat-label">Total Petrol</div><div class="stat-value amber" id="sumLitres">0 L</div><div class="stat-sub">filled</div></div>
+    <div class="stat-card"><div class="stat-label">Total KM</div><div class="stat-value" id="sumKM">0</div><div class="stat-sub">driven</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Mileage</div><div class="stat-value green" id="sumMileage">&#8212;</div><div class="stat-sub">km/L overall</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Rate</div><div class="stat-value" id="sumRate">&#8212;</div><div class="stat-sub">&#8377;/L weighted avg</div></div>
+  </div>
+
+  <div class="section-header">
+    <div class="section-title">Fuel Log <span id="countLabel"></span></div>
+  </div>
+
+  <div class="table-card">
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('bunk')"       id="th-bunk">     Petrol Bunk       <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('date')"       id="th-date">     Date              <span class="sort-icon">&#9660;</span></th>
+            <th onclick="sortBy('startKM')"    id="th-startKM">  From KM           <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('endKM')"      id="th-endKM">    To KM             <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('totalKM')"    id="th-totalKM">  Total KM          <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('projected')"  id="th-projected"> Projected (km)   <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('incomingKM')"  id="th-incomingKM"> Pre-fill KM      <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('remainingKM')" id="th-remainingKM">Post-trip KM     <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('fuelAmount')" id="th-fuelAmount">Amount           <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('fuelRate')"   id="th-fuelRate"> Fuel Rate         <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('fuelQty')"    id="th-fuelQty">  Petrol (L)        <span class="sort-icon">&#8645;</span></th>
+            <th onclick="sortBy('mileage')"    id="th-mileage">  Mileage           <span class="sort-icon">&#8645;</span></th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<!-- ADD / EDIT MODAL -->
+<div class="overlay" id="formOverlay" onclick="overlayClick(event,'formOverlay')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">Add Fuel Entry</div>
+      <button class="modal-close" onclick="closeModal()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <form id="entryForm" onsubmit="saveEntry(event)">
+        <div class="form-grid">
+
+          <div class="field form-full">
+            <label>Petrol Bunk / Station</label>
+            <input type="text" id="f_bunk" placeholder="e.g. Reliance-Home" list="bunkList" required />
+            <datalist id="bunkList"></datalist>
+          </div>
+
+          <div class="field form-full">
+            <label>Date</label>
+            <input type="date" id="f_date" required />
+          </div>
+
+          <hr class="divider" />
+          <div class="section-lbl">&#9981; Fuel Details</div>
+
+          <div class="field">
+            <label>Amount (&#8377;)</label>
+            <input type="number" id="f_amount" placeholder="e.g. 1000" min="0" step="0.01" required oninput="calcAll()" />
+          </div>
+          <div class="field">
+            <label>Fuel Rate (&#8377;/L)</label>
+            <input type="number" id="f_rate" placeholder="e.g. 98.82" min="0" step="0.01" required oninput="calcAll()" />
+          </div>
+
+          <div class="field form-full">
+            <label>Petrol Qty &#8212; Auto Calculated (Amount &#247; Rate)</label>
+            <div class="calc-chip">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+              <div><div class="cl">Litres</div><div class="cv" id="qtyDisplay">Enter amount and rate</div></div>
+            </div>
+            <input type="hidden" id="f_qty" />
+          </div>
+
+          <hr class="divider" />
+          <div class="section-lbl">&#128739; Odometer</div>
+
+          <div class="field">
+            <label>From KM (Start)</label>
+            <input type="number" id="f_startKM" placeholder="e.g. 3662" min="0" required oninput="calcAll()" />
+          </div>
+          <div class="field">
+            <label>To KM (End)</label>
+            <input type="number" id="f_endKM" placeholder="e.g. 3883" min="0" oninput="calcAll()" />
+            <span class="helper">Leave blank if trip not finished</span>
+          </div>
+
+          <div class="field form-full">
+            <label>Total KM &#8212; Auto Calculated (To &#8722; From)</label>
+            <div class="calc-chip">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <div><div class="cl">Distance</div><div class="cv" id="totalKMDisplay">Enter From and To KM</div></div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Pre-fill Range (km) &#8212; incoming</label>
+            <input type="number" id="f_incomingKM" placeholder="e.g. 117" min="0" step="1" oninput="calcAll()" />
+            <span class="helper">KM the car showed <strong>before</strong> adding fuel here. Leave blank if near-empty.</span>
+          </div>
+
+          <div class="field">
+            <label>Post-trip Range (km) &#8212; outgoing</label>
+            <input type="number" id="f_remainKM" placeholder="e.g. 35" min="0" step="1" oninput="calcAll()" />
+            <span class="helper">KM the car showed when arriving at the <strong>next</strong> fuel stop.</span>
+          </div>
+
+          <div class="field form-full">
+            <label>Effective KM &#8212; (Total + Outgoing) &minus; Incoming</label>
+            <div class="calc-chip" style="border-color:#86efac; background:var(--success-light);">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+              <div><div class="cl" style="color:#4ade80;">Effective distance for mileage</div><div class="cv" style="color:var(--success);" id="effectiveKMDisplay">Enter KM values above</div></div>
+            </div>
+          </div>
+
+          <hr class="divider" />
+          <div class="section-lbl">&#128202; Projection</div>
+
+          <div class="field form-full">
+            <label>Projected Range (km)</label>
+            <input type="number" id="f_projected" placeholder="Auto-suggested from avg mileage" min="0" step="1" />
+            <span class="helper">Auto-filled = Petrol &#215; overall avg mileage. You can override.</span>
+          </div>
+
+        </div>
+      </form>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveEntry(event)" id="saveBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Entry
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- DELETE CONFIRM -->
+<div class="overlay" id="delOverlay" onclick="overlayClick(event,'delOverlay')">
+  <div class="confirm-modal">
+    <div class="confirm-icon">
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
+    </div>
+    <div class="confirm-title">Delete Entry?</div>
+    <div class="confirm-msg">This action cannot be undone.</div>
+    <div class="confirm-actions">
+      <button class="btn btn-cancel" onclick="closeDelete()">Cancel</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
