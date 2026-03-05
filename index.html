@@ -106,18 +106,8 @@
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-state p { font-size: 0.9rem; margin-bottom: 16px; }
     /* ── FILE BAR ── */
-    .file-bar { background: #0f172a; border-bottom: 1px solid #1e293b; padding: 8px 12px; min-height: 44px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: max(8px, env(safe-area-inset-top)); }
-    .file-status { display: flex; align-items: center; gap: 6px; flex: 1; min-width: 0; }
-    .file-dot { width: 8px; height: 8px; border-radius: 50%; background: #475569; flex-shrink: 0; }
-    .file-dot.linked { background: #4ade80; box-shadow: 0 0 6px #4ade80; }
-    .file-name { font-size: 0.68rem; color: #94a3b8; font-family: 'Courier New', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
-    .file-name.linked { color: #e2e8f0; }
-    .file-actions { display: flex; gap: 4px; flex-shrink: 0; flex-wrap: wrap; }
-    .btn-file { display: inline-flex; align-items: center; gap: 4px; padding: 6px 9px; border-radius: 5px; border: 1px solid #334155; background: transparent; color: #94a3b8; font-size: 0.66rem; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; min-height: 32px; -webkit-user-select: none; user-select: none; }
-    .btn-file:hover { background: #1e293b; color: #e2e8f0; }
-    .btn-file.active { border-color: #2563eb; color: #93c5fd; }
-    .btn-file.active:hover { background: #1e3a5f; }
-    .save-indicator { font-size: 0.62rem; color: #64748b; margin-left: 2px; transition: color 0.3s; }
+    .file-bar { background: #0f172a; border-bottom: 1px solid #1e293b; padding: 8px 12px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: max(8px, env(safe-area-inset-top)); }
+    .save-indicator { font-size: 0.62rem; color: #64748b; margin-right: 12px; transition: color 0.3s; }
     .save-indicator.saving { color: #fbbf24; }
     .save-indicator.saved  { color: #4ade80; }
     @media (max-width: 768px) { 
@@ -154,17 +144,7 @@
 </header>
 
   <div class="file-bar">
-    <div class="file-status">
-      <div class="file-dot" id="fileDot"></div>
-      <span class="file-name" id="fileName">No file linked — using browser storage</span>
-      <span class="save-indicator" id="saveIndicator"></span>
-    </div>
-    <div class="file-actions">
-      <button class="btn-file active" onclick="showGitHubSetup()" title="Configure GitHub token for auto-save">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m6-4v4m-12-4v4M3 9h18M3 17h18"/></svg>
-        GitHub Setup
-      </button>
-    </div>
+    <span class="save-indicator" id="saveIndicator"></span>
   </div>
 
 <main>
@@ -326,39 +306,6 @@
       <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
     </div>
   </div>
-</div>
-
-<!-- GITHUB SETUP MODAL -->
-<div class="overlay" id="ghSetupOverlay" onclick="overlayClick(event,'ghSetupOverlay')">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title">GitHub Auto-Save Setup</div>
-      <button class="modal-close" onclick="closeGitHubSetup()">&#x2715;</button>
-    </div>
-    <div class="modal-body">
-      <div class="field form-full">
-        <label>GitHub Personal Access Token</label>
-        <input type="password" id="gh_token_input" placeholder="Paste your GitHub token here" />
-        <span class="helper">Your token will be stored locally in your browser. Get one at: <br><a href="https://github.com/settings/tokens" target="_blank" style="color: var(--primary);">github.com/settings/tokens</a></span>
-      </div>
-      <div style="margin-top: 16px; padding: 12px; background: var(--primary-light); border-radius: 7px; font-size: 0.75rem; color: var(--text-muted);">
-        <strong>Instructions:</strong>
-        <ol style="margin: 8px 0 0 16px;">
-          <li>Go to github.com/settings/tokens</li>
-          <li>Click "Generate new token (classic)"</li>
-          <li>Select scope: <strong>repo</strong></li>
-          <li>Copy the token and paste it below</li>
-          <li>Click Save</li>
-        </ol>
-      </div>
-    </div>
-    <div class="modal-footer">
-      <button class="btn btn-cancel" onclick="closeGitHubSetup()">Cancel</button>
-      <button class="btn btn-primary" onclick="saveGitHubToken()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Save Token
-      </button>
-    </div>
 </div>
 
 <!-- GITHUB LOGIN REQUIRED MODAL -->

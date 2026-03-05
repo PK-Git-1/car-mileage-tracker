@@ -509,30 +509,7 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubSetup(); closeGitHubLoginRequired(); } });
-
-/* ===================== GITHUB SETUP ===================== */
-function showGitHubSetup() {
-  const token = getGitHubToken();
-  document.getElementById('gh_token_input').value = token;
-  document.getElementById('ghSetupOverlay').classList.add('open');
-}
-
-function closeGitHubSetup() {
-  document.getElementById('ghSetupOverlay').classList.remove('open');
-}
-
-function saveGitHubToken() {
-  const token = document.getElementById('gh_token_input').value.trim();
-  if (!token) {
-    showToast('Token cannot be empty', 'error');
-    return;
-  }
-  localStorage.setItem('gh_token', token);
-  closeGitHubSetup();
-  showToast('GitHub token saved! Changes will now auto-save.', 'success');
-  location.reload(); // Reload to apply token
-}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubLoginRequired(); } });
 
 /* ===================== GITHUB LOGIN REQUIRED ===================== */
 function showGitHubLoginRequired() {
