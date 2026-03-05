@@ -2,21 +2,84 @@
 
 /* ===================== STORAGE ===================== */
 const STORE_KEY = 'carMileageTracker_v2';
+const GITHUB_OWNER = 'pk-git-1';
+const GITHUB_REPO = 'punchu';
+const GITHUB_BRANCH = 'main';
+
 function loadData()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || null; } catch { return null; } }
 function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
+function getGitHubToken() { return localStorage.getItem('gh_token') || ''; }
 function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
 /* ===================== FILE SYSTEM ===================== */
 let fileHandle = null;
 const FSA = typeof window.showOpenFilePicker === 'function';
 
+async function commitToGitHub(data) {
+  const token = getGitHubToken();
+  if (!token) {
+    console.log('GitHub token not set, skipping auto-commit');
+    return;
+  }
+  
+  try {
+    setSaveIndicator('saving');
+    
+    // Get current file SHA (needed for update)
+    const getRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json?ref=${GITHUB_BRANCH}`,
+      { headers: { 'Authorization': `token ${token}` } }
+    );
+    
+    let sha = null;
+    if (getRes.ok) {
+      const fileData = await getRes.json();
+      sha = fileData.sha;
+    }
+    
+    // Prepare commit
+    const content = btoa(JSON.stringify(data, null, 2)); // Base64 encode
+    const message = `Update fuel log: ${new Date().toLocaleString()}`;
+    
+    const payload = {
+      message,
+      content,
+      branch: GITHUB_BRANCH,
+      ...(sha && { sha }) // Include SHA if updating existing file
+    };
+    
+    // Commit to GitHub
+    const putRes = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      }
+    );
+    
+    if (putRes.ok) {
+      setSaveIndicator('saved');
+      console.log('Saved to GitHub');
+    } else {
+      const err = await putRes.json();
+      throw new Error(err.message || 'GitHub commit failed');
+    }
+  } catch (err) {
+    setSaveIndicator('');
+    showToast('GitHub save failed: ' + err.message, 'error');
+    console.error('GitHub commit error:', err);
+  }
+}
+
 function persistData(d) {
   saveData(d);
+  commitToGitHub(d);
   if (fileHandle) {
-    setSaveIndicator('saving');
-    writeFileHandle(d)
-      .then(() => setSaveIndicator('saved'))
-      .catch(err => { setSaveIndicator(''); showToast('File write failed: ' + err.message, 'error'); });
+    writeFileHandle(d).catch(err => console.error('File write error:', err));
   }
 }
 
@@ -131,25 +194,59 @@ async function loadFromFile() {
       }
     }
   } catch (err) {
-    console.log('fuel-log.json not found or error loading:', err.message);
+    console.log('fuel-log.json not found:', err.message);
+  }
+  return false;
+}
+
+async function loadFromGitHub() {
+  const token = getGitHubToken();
+  if (!token) return false;
+  
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/contents/fuel-log.json?ref=${GITHUB_BRANCH}`,
+      { headers: { 'Authorization': `token ${token}` } }
+    );
+    
+    if (response.ok) {
+      const fileData = await response.json();
+      const content = atob(fileData.content); // Decode base64
+      const parsed = JSON.parse(content);
+      if (Array.isArray(parsed)) {
+        data = parsed;
+        saveData(data);
+        console.log('Loaded from GitHub');
+        setFileLinked('fuel-log.json (GitHub Auto-Save)');
+        return true;
+      }
+    }
+  } catch (err) {
+    console.log('GitHub load failed:', err.message);
   }
   return false;
 }
 
 async function initializeData() {
-  // Try loading from fuel-log.json first
-  const loaded = await loadFromFile();
-  if (!loaded) {
-    // Fall back to browser storage
-    const stored = loadData();
-    if (stored) {
-      data = stored;
-      console.log('Loaded from browser storage');
-    } else {
-      // Start with empty data
-      data = [];
-      saveData(data);
-      console.log('Starting with empty data');
+  // Try loading from GitHub first (if token is set)
+  const loadedGH = await loadFromGitHub();
+  
+  if (!loadedGH) {
+    // Fall back to local file
+    const loaded = await loadFromFile();
+    
+    if (!loaded) {
+      // Fall back to browser storage
+      const stored = loadData();
+      if (stored) {
+        data = stored;
+        console.log('Loaded from browser storage');
+      } else {
+        // Start with empty data
+        data = [];
+        saveData(data);
+        console.log('Starting with empty data');
+      }
     }
   }
   render();
@@ -482,7 +579,30 @@ function showToast(msg, type = 'success') {
   toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
 }
 
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); } });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); closeGitHubSetup(); } });
+
+/* ===================== GITHUB SETUP ===================== */
+function showGitHubSetup() {
+  const token = getGitHubToken();
+  document.getElementById('gh_token_input').value = token;
+  document.getElementById('ghSetupOverlay').classList.add('open');
+}
+
+function closeGitHubSetup() {
+  document.getElementById('ghSetupOverlay').classList.remove('open');
+}
+
+function saveGitHubToken() {
+  const token = document.getElementById('gh_token_input').value.trim();
+  if (!token) {
+    showToast('Token cannot be empty', 'error');
+    return;
+  }
+  localStorage.setItem('gh_token', token);
+  closeGitHubSetup();
+  showToast('GitHub token saved! Changes will now auto-save.', 'success');
+  location.reload(); // Reload to apply token
+}
 
 // Initialize on DOM ready
 if (document.readyState === 'loading') {

@@ -153,32 +153,35 @@
   </button>
 </header>
 
-<!-- FILE BAR -->
-<div class="file-bar">
-  <div class="file-status">
-    <div class="file-dot" id="fileDot"></div>
-    <span class="file-name" id="fileName">No file linked &mdash; using browser storage</span>
-    <span class="save-indicator" id="saveIndicator"></span>
+  <div class="file-bar">
+    <div class="file-status">
+      <div class="file-dot" id="fileDot"></div>
+      <span class="file-name" id="fileName">No file linked — using browser storage</span>
+      <span class="save-indicator" id="saveIndicator"></span>
+    </div>
+    <div class="file-actions">
+      <button class="btn-file active" onclick="showGitHubSetup()" title="Configure GitHub token for auto-save">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v12m6-4v4m-12-4v4M3 9h18M3 17h18"/></svg>
+        GitHub Setup
+      </button>
+      <button class="btn-file active" onclick="fileOpen()" title="Open an existing fuel-log.json file">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+        Open JSON
+      </button>
+      <button class="btn-file" id="btnSaveAs" onclick="fileSaveAs()" title="Save a copy / link a new file">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save As
+      </button>
+      <button class="btn-file" onclick="fileExport()" title="Download a copy as JSON">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Export
+      </button>
+      <button class="btn-file" onclick="fileImport()" title="Import from a JSON file (replaces current data)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        Import
+      </button>
+    </div>
   </div>
-  <div class="file-actions">
-    <button class="btn-file active" onclick="fileOpen()" title="Open an existing fuel-log.json file">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-      Open JSON
-    </button>
-    <button class="btn-file" id="btnSaveAs" onclick="fileSaveAs()" title="Save a copy / link a new file">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-      Save As
-    </button>
-    <button class="btn-file" onclick="fileExport()" title="Download a copy as JSON">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-      Export
-    </button>
-    <button class="btn-file" onclick="fileImport()" title="Import from a JSON file (replaces current data)">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Import
-    </button>
-  </div>
-</div>
 <!-- hidden input for import fallback -->
 <input type="file" id="importInput" accept=".json,application/json" style="display:none" onchange="handleImportFile(event)" />
 
@@ -339,6 +342,40 @@
     <div class="confirm-actions">
       <button class="btn btn-cancel" onclick="closeDelete()">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- GITHUB SETUP MODAL -->
+<div class="overlay" id="ghSetupOverlay" onclick="overlayClick(event,'ghSetupOverlay')">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">GitHub Auto-Save Setup</div>
+      <button class="modal-close" onclick="closeGitHubSetup()">&#x2715;</button>
+    </div>
+    <div class="modal-body">
+      <div class="field form-full">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="gh_token_input" placeholder="Paste your GitHub token here" />
+        <span class="helper">Your token will be stored locally in your browser. Get one at: <br><a href="https://github.com/settings/tokens" target="_blank" style="color: var(--primary);">github.com/settings/tokens</a></span>
+      </div>
+      <div style="margin-top: 16px; padding: 12px; background: var(--primary-light); border-radius: 7px; font-size: 0.75rem; color: var(--text-muted);">
+        <strong>Instructions:</strong>
+        <ol style="margin: 8px 0 0 16px;">
+          <li>Go to github.com/settings/tokens</li>
+          <li>Click "Generate new token (classic)"</li>
+          <li>Select scope: <strong>repo</strong></li>
+          <li>Copy the token and paste it below</li>
+          <li>Click Save</li>
+        </ol>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-cancel" onclick="closeGitHubSetup()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveGitHubToken()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Save Token
+      </button>
     </div>
   </div>
 </div>
