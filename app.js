@@ -534,8 +534,63 @@ function saveGitHubLoginToken() {
 }
 
 // Initialize on DOM ready
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeData);
-} else {
+function checkLoginScreen() {
+  const hasToken = getGitHubToken();
+  const hasSeenLogin = localStorage.getItem('loginScreenSeen');
+  
+  // Show login screen only if first visit or no token set
+  if (!hasSeenLogin && !hasToken) {
+    showLoginScreen();
+  } else {
+    hideLoginScreen();
+    initializeData();
+  }
+}
+
+function showLoginScreen() {
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) {
+    loginScreen.classList.remove('hidden');
+  }
+}
+
+function hideLoginScreen() {
+  const loginScreen = document.getElementById('loginScreen');
+  if (loginScreen) {
+    loginScreen.classList.add('hidden');
+  }
+}
+
+function skipGitHubLogin() {
+  localStorage.setItem('loginScreenSeen', 'true');
+  hideLoginScreen();
   initializeData();
+  showToast('You can add GitHub token later through the authentication modal.', 'success');
+}
+
+function submitInitialLogin() {
+  const tokenInput = document.getElementById('loginTokenInput');
+  const token = tokenInput.value.trim();
+  
+  if (!token) {
+    showToast('Please enter a GitHub token', 'error');
+    return;
+  }
+  
+  if (token.length < 20) {
+    showToast('Token seems invalid. Please check and try again.', 'error');
+    return;
+  }
+  
+  localStorage.setItem('gh_token', token);
+  localStorage.setItem('loginScreenSeen', 'true');
+  hideLoginScreen();
+  showToast('GitHub token saved! Initializing...', 'success');
+  initializeData();
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkLoginScreen);
+} else {
+  checkLoginScreen();
 }

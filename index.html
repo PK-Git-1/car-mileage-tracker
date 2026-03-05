@@ -105,11 +105,25 @@
     .toast.error   { border-left: 4px solid var(--danger); }
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
     .empty-state p { font-size: 0.9rem; margin-bottom: 16px; }
-    /* ── FILE BAR ── */
-    .file-bar { background: #0f172a; border-bottom: 1px solid #1e293b; padding: 8px 12px; min-height: 44px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding-top: max(8px, env(safe-area-inset-top)); }
-    .save-indicator { font-size: 0.62rem; color: #64748b; margin-right: 12px; transition: color 0.3s; }
-    .save-indicator.saving { color: #fbbf24; }
-    .save-indicator.saved  { color: #4ade80; }
+    /* ========== LOGIN SCREEN ========== */
+    .login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; }
+    .login-screen.hidden { display: none; }
+    .login-container { background: var(--card); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 420px; padding: 40px 28px; text-align: center; animation: slideUp 0.3s ease; }
+    .login-logo { width: 64px; height: 64px; background: var(--primary-light); border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 24px; }
+    .login-logo svg { color: var(--primary); }
+    .login-title { font-size: 1.3rem; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+    .login-subtitle { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 28px; line-height: 1.5; }
+    .login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; text-align: left; }
+    .login-field label { font-size: 0.73rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
+    .login-field input { padding: 11px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 16px; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s; }
+    .login-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+    .login-helper { font-size: 0.7rem; color: var(--text-light); margin-top: 6px; }
+    .login-helper a { color: var(--primary); text-decoration: none; }
+    .login-helper a:hover { text-decoration: underline; }
+    .login-actions { display: flex; gap: 10px; margin-top: 24px; }
+    .login-actions button { flex: 1; }
+    .login-skip { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
+    .login-skip:hover { background: var(--border); }
     @media (max-width: 768px) { 
       .form-grid { grid-template-columns: 1fr; } 
       .summary-grid { grid-template-columns: repeat(2, 1fr); } 
@@ -142,10 +156,6 @@
     Add Entry
   </button>
 </header>
-
-  <div class="file-bar">
-    <span class="save-indicator" id="saveIndicator"></span>
-  </div>
 
 <main>
   <div class="summary-grid">
@@ -343,6 +353,34 @@
 </div>
 
 <div class="toast" id="toast"></div>
+
+<!-- INITIAL LOGIN SCREEN -->
+<div class="login-screen" id="loginScreen">
+  <div class="login-container">
+    <div class="login-logo">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="1" y="3" width="15" height="13" rx="2"/><path d="M16 8h4l3 3v5h-7V8z"/>
+        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+      </svg>
+    </div>
+    <div class="login-title">Car Mileage Tracker</div>
+    <div class="login-subtitle">Track your fuel consumption and mileage with ease. Auto-sync to GitHub for backup.</div>
+    
+    <div class="login-field">
+      <label>GitHub Personal Access Token</label>
+      <input type="password" id="loginTokenInput" placeholder="Paste your GitHub token" />
+      <span class="login-helper">Get a new token at: <a href="https://github.com/settings/tokens" target="_blank">github.com/settings/tokens</a></span>
+    </div>
+    
+    <div class="login-actions">
+      <button class="btn btn-cancel login-skip" onclick="skipGitHubLogin()">Skip for Now</button>
+      <button class="btn btn-primary" onclick="submitInitialLogin()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+        Set Token & Continue
+      </button>
+    </div>
+  </div>
+</div>
 
 <script src="app.js"></script>
 </body>
