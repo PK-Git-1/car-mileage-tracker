@@ -60,6 +60,16 @@ async function saveAndCommit(data, message) {
       console.log('ℹ️  Git commit note:', commitErr.message);
     }
     
+    // Push to GitHub
+    try {
+      console.log('📤 Pushing to GitHub...');
+      await git.push('origin', 'main');
+      console.log('✓ Pushed to GitHub successfully');
+    } catch (pushErr) {
+      console.warn('⚠️  Push to GitHub failed:', pushErr.message);
+      console.warn('ℹ️  Data saved locally, but not synced to GitHub');
+    }
+    
     return true;
   } catch (err) {
     console.error('❌ Error saving/committing:', err.message);
