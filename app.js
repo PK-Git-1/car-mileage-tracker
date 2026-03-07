@@ -1,20 +1,55 @@
 'use strict';
 
-/* ===================== STORAGE ===================== */
-const STORE_KEY = 'carMileageTracker_v2';
-const AUTH_KEY = 'carMileageTracker_auth';
+/* ===================== STORAGE & API ===================== */
+const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/PK-Git-1/punchu/main/fuel-log.json';
+const API_BASE = 'http://localhost:3000/api';
+let currentUsername = ''; // Session-only (not persisted)
 
-function loadData()  { try { return JSON.parse(localStorage.getItem(STORE_KEY)) || null; } catch { return null; } }
-function saveData(d) { localStorage.setItem(STORE_KEY, JSON.stringify(d)); }
-function getUsername() { return localStorage.getItem(AUTH_KEY) || ''; }
+function getUsername() { return currentUsername; }
 function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
 
-/* ===================== FILE SYSTEM ===================== */
+// Load data from GitHub
+async function loadDataFromAPI() {
+  try {
+    console.log('📡 Fetching data from GitHub:', GITHUB_RAW_URL);
+    const response = await fetch(GITHUB_RAW_URL);
+    console.log('Response status:', response.status);
+    if (!response.ok) {
+      throw new Error(`GitHub Error: ${response.status} ${response.statusText}`);
+    }
+    const json = await response.json();
+    console.log('✓ Data loaded from GitHub:', json?.length || 0, 'entries');
+    return Array.isArray(json) ? json : [];
+  } catch (err) {
+    console.error('❌ Error loading data from GitHub:', err.message);
+    showToast('⚠️ Failed to load data from GitHub. Check your internet connection.', 'error');
+    return [];
+  }
+}
 
-// Data persistence is now only via localStorage (no GitHub sync)
-function persistData(d) {
-  saveData(d);
-  commitToGitHub(d);
+// Save data to API with git commit
+async function persistData(d, message = 'Update fuel log') {
+  try {
+    console.log('💾 Saving', d.length, 'entries to API...');
+    const response = await fetch(`${API_BASE}/data`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: d, message })
+    });
+    console.log('Response status:', response.status);
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`API Error: ${response.status} ${errText}`);
+    }
+    const result = await response.json();
+    console.log('✓ Data saved and committed to Git');
+    showToast('✓ Data saved to Git', 'success');
+    return true;
+  } catch (err) {
+    console.error('❌ Error saving data:', err.message);
+    showToast('❌ Failed to save data. Server error: ' + err.message, 'error');
+    return false;
+  }
 }
 
 let siTimer;
@@ -29,36 +64,10 @@ function setSaveIndicator(state) {
 /* ===================== DATA LOADING ===================== */
 let data = [];
 
-async function loadFromFile() {
-  try {
-    const response = await fetch('fuel-log.json');
-    if (response.ok) {
-      const fileData = await response.json();
-      if (Array.isArray(fileData)) {
-        data = fileData;
-        saveData(data);
-        console.log('Loaded from fuel-log.json');
-        return true;
-      }
-    }
-  } catch (err) {
-    console.log('fuel-log.json not found:', err.message);
-  }
-  return false;
-}
-
 async function initializeData() {
-  // Load from localStorage
-  const stored = loadData();
-  if (stored && Array.isArray(stored)) {
-    data = stored;
-    console.log('Loaded from browser storage');
-  } else {
-    // Start with empty data
-    data = [];
-    saveData(data);
-    console.log('Starting with empty data');
-  }
+  // Load from API/Git
+  data = await loadDataFromAPI();
+  console.log(`Loaded ${data.length} entries from Git`);
   render();
 }
 
@@ -430,7 +439,7 @@ function showMainContent() {
 
 function logout() {
   if (confirm('Are you sure you want to logout?')) {
-    localStorage.removeItem(AUTH_KEY);
+    currentUsername = ''; // Clear session
     showToast('Logged out successfully', 'success');
     setTimeout(() => {
       location.reload();
@@ -462,8 +471,8 @@ function submitLogin() {
     return;
   }
   
-  // Store username in localStorage (password not stored for security)
-  localStorage.setItem(AUTH_KEY, username);
+  // Store username in session (not persisted)
+  currentUsername = username;
   hideLoginScreen();
   showMainContent();
   showToast('Welcome ' + username + '!', 'success');

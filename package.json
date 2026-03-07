@@ -1,0 +1,17 @@
+{
+  "name": "car-mileage-tracker",
+  "version": "1.0.0",
+  "description": "Track your car's fuel consumption and mileage with Git-based persistence",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "body-parser": "^1.20.2",
+    "simple-git": "^3.20.0"
+  }
+}
