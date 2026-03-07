@@ -338,12 +338,12 @@
     
     <div class="login-field">
       <label>Username</label>
-      <input type="text" id="loginUsername" placeholder="Enter your username" />
+      <input type="text" id="loginUsername" placeholder="Enter your username" onkeypress="if(event.key === 'Enter') submitLogin()" />
     </div>
 
     <div class="login-field">
       <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="Enter your password" />
+      <input type="password" id="loginPassword" placeholder="Enter your password" onkeypress="if(event.key === 'Enter') submitLogin()" />
     </div>
     
     <div class="login-actions">
