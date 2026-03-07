@@ -1,6 +1,7 @@
 'use strict';
 
 /* ===================== STORAGE & API ===================== */
+const GITHUB_REPO = 'https://github.com/PK-Git-1/punchu';
 const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/PK-Git-1/punchu/main/fuel-log.json';
 const API_BASE = 'http://localhost:3000/api';
 let currentUsername = ''; // Session-only (not persisted)
@@ -43,7 +44,17 @@ async function persistData(d, message = 'Update fuel log') {
     }
     const result = await response.json();
     console.log('✓ Data saved and committed to Git');
-    showToast('✓ Data saved to Git', 'success');
+    
+    // Push to GitHub
+    console.log('📤 Pushing to GitHub...');
+    const pushResponse = await fetch(`${API_BASE}/push`, { method: 'POST' });
+    if (pushResponse.ok) {
+      console.log('✓ Pushed to GitHub successfully');
+      showToast('✓ Data saved and pushed to GitHub', 'success');
+    } else {
+      console.warn('⚠️ Push to GitHub failed, but local save succeeded');
+      showToast('✓ Data saved locally (push to GitHub may have failed)', 'success');
+    }
     return true;
   } catch (err) {
     console.error('❌ Error saving data:', err.message);
