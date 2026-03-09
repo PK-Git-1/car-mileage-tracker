@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+package-lock.json
+yarn.lock
+
+# Google Sheets Credentials (SENSITIVE - DO NOT COMMIT)
+google-credentials.json
+
+# Local backup files
+fuel-log.json
+fuel-log-*.json
+fuel-log - Copy.json
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Temporary files
+temp/
+tmp/
+
+# Dev / old files (not needed for GitHub Pages)
+_dev/
