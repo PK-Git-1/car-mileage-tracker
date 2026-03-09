@@ -1,98 +1,140 @@
 'use strict';
 
 /* ===================== STORAGE & API ===================== */
-const GITHUB_REPO = 'https://github.com/PK-Git-1/punchu';
-const GITHUB_RAW_URL = 'https://raw.githubusercontent.com/PK-Git-1/punchu/main/fuel-log.json';
-const API_BASE = 'http://localhost:3000/api';
-let currentUsername = ''; // Session-only (not persisted)
+// IMPORTANT: Update this URL after deploying Google Apps Script
+// Deploy script from AppsScript.js at: https://script.google.com
+// Then paste the deployment URL here
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0lhTUU2rzmk0oyXhVY2lFG56E6zRuXK9OgT1QKkWAtzLErg9Arl8S6corI6gxB1qO7A/exec';
 
+let currentUsername = '';
 function getUsername() { return currentUsername; }
-function uid()       { return Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
-// Load data from GitHub
+// ============ API CALLS TO GOOGLE APPS SCRIPT ============
+
+async function callAppsScript(action, payload = {}) {
+  try {
+    const url = new URL(APPS_SCRIPT_URL);
+    url.searchParams.append('action', action);
+    
+    let options;
+    
+    if (action.startsWith('get')) {
+      // GET request - no body, no custom headers to avoid CORS preflight
+      options = { method: 'GET' };
+      if (payload.id) url.searchParams.append('id', payload.id);
+    } else {
+      // POST request - use text/plain to avoid CORS preflight
+      // (application/json triggers preflight which Apps Script can't handle)
+      options = {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      };
+    }
+    
+    const response = await fetch(url.toString(), options);
+    if (!response.ok) {
+      throw new Error(`API Error: ${response.status}`);
+    }
+    return await response.json();
+  } catch (err) {
+    console.error(`❌ API Error (${action}):`, err.message);
+    showToast(`❌ Connection error: ${err.message}`, 'error');
+    throw err;
+  }
+}
+
+// Load all data from Google Sheets
 async function loadDataFromAPI() {
   try {
-    console.log('📡 Fetching data from GitHub:', GITHUB_RAW_URL);
-    const response = await fetch(GITHUB_RAW_URL);
-    console.log('Response status:', response.status);
-    if (!response.ok) {
-      throw new Error(`GitHub Error: ${response.status} ${response.statusText}`);
+    console.log('📡 Fetching data from Google Sheets...');
+    const result = await callAppsScript('get');
+    if (result.success) {
+      const json = result.data || [];
+      console.log('✓ Data loaded:', json.length, 'entries');
+      return Array.isArray(json) ? json : [];
     }
-    const json = await response.json();
-    console.log('✓ Data loaded from GitHub:', json?.length || 0, 'entries');
-    return Array.isArray(json) ? json : [];
+    throw new Error(result.error || 'Failed to load data');
   } catch (err) {
-    console.error('❌ Error loading data from GitHub:', err.message);
-    showToast('⚠️ Failed to load data from GitHub. Check your internet connection.', 'error');
+    console.error('❌ Error loading data:', err.message);
+    showToast('⚠️ Failed to load data. Check connection.', 'error');
     return [];
   }
 }
 
-// Save data to API with git commit
-async function persistData(d, message = 'Update fuel log') {
+// Save single entry (create)
+async function addEntryAPI(entry) {
   try {
-    console.log('💾 Saving', d.length, 'entries to API...');
-    const response = await fetch(`${API_BASE}/data`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ data: d, message })
-    });
-    console.log('Response status:', response.status);
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`API Error: ${response.status} ${errText}`);
+    console.log('💾 Saving entry:', entry.id);
+    const result = await callAppsScript('add', { entry });
+    if (result.success) {
+      showToast('✓ Entry saved', 'success');
+      return true;
     }
-    const result = await response.json();
-    console.log('✓ Data saved and committed to Git');
-    
-    // Push to GitHub
-    console.log('📤 Pushing to GitHub...');
-    const pushResponse = await fetch(`${API_BASE}/push`, { method: 'POST' });
-    if (pushResponse.ok) {
-      console.log('✓ Pushed to GitHub successfully');
-      showToast('✓ Data saved and pushed to GitHub', 'success');
-    } else {
-      console.warn('⚠️ Push to GitHub failed, but local save succeeded');
-      showToast('✓ Data saved locally (push to GitHub may have failed)', 'success');
-    }
-    return true;
+    throw new Error(result.error);
   } catch (err) {
-    console.error('❌ Error saving data:', err.message);
-    showToast('❌ Failed to save data. Server error: ' + err.message, 'error');
+    console.error('❌ Error saving entry:', err.message);
+    showToast('❌ Failed to save: ' + err.message, 'error');
     return false;
   }
 }
 
-let siTimer;
-function setSaveIndicator(state) {
-  const el = document.getElementById('saveIndicator');
-  clearTimeout(siTimer);
-  if (state === 'saving') { el.className = 'save-indicator saving'; el.textContent = '● saving…'; }
-  else if (state === 'saved') { el.className = 'save-indicator saved'; el.textContent = '✔ saved'; siTimer = setTimeout(() => { el.textContent = ''; el.className = 'save-indicator'; }, 2500); }
-  else { el.className = 'save-indicator'; el.textContent = ''; }
+// Update entry
+async function updateEntryAPI(id, updates) {
+  try {
+    const result = await callAppsScript('update', { id, updates });
+    if (result.success) {
+      showToast('✓ Entry updated', 'success');
+      return true;
+    }
+    throw new Error(result.error);
+  } catch (err) {
+    console.error('❌ Error updating:', err.message);
+    showToast('❌ Failed to update: ' + err.message, 'error');
+    return false;
+  }
 }
 
-/* ===================== DATA LOADING ===================== */
+// Delete entry
+async function deleteEntryAPI(id) {
+  try {
+    const result = await callAppsScript('delete', { id });
+    if (result.success) {
+      showToast('✓ Entry deleted', 'success');
+      return true;
+    }
+    throw new Error(result.error);
+  } catch (err) {
+    console.error('❌ Error deleting:', err.message);
+    showToast('❌ Failed to delete: ' + err.message, 'error');
+    return false;
+  }
+}
+
+/* ===================== DATA MANAGEMENT ===================== */
 let data = [];
 
 async function initializeData() {
-  // Load from API/Git
   data = await loadDataFromAPI();
-  console.log(`Loaded ${data.length} entries from Git`);
+  console.log(`Loaded ${data.length} entries from Google Sheets`);
   render();
 }
 
 /* ===================== SORT ===================== */
 let sortKey = 'date', sortAsc = false;
-function sortBy(key) { if (sortKey === key) sortAsc = !sortAsc; else { sortKey = key; sortAsc = false; } render(); }
+function sortBy(key) {
+  if (sortKey === key) sortAsc = !sortAsc;
+  else { sortKey = key; sortAsc = false; }
+  render();
+}
 
 /* ===================== COMPUTED FIELDS ===================== */
-function totalKM(r)     { return (r.endKM != null && r.endKM !== '') ? r.endKM - r.startKM : null; }
-function remainKM(r)    { return (r.remainingKM != null && r.remainingKM !== '') ? +r.remainingKM : 0; }
-function inKM(r)        { return (r.incomingKM  != null && r.incomingKM  !== '') ? +r.incomingKM  : 0; }
-// effectiveKM = km driven + outgoing range (at next pump) − incoming range (before THIS fill)
+function totalKM(r) { return (r.endKM != null && r.endKM !== '') ? r.endKM - r.startKM : null; }
+function remainKM(r) { return (r.remainingKM != null && r.remainingKM !== '') ? +r.remainingKM : 0; }
+function inKM(r) { return (r.incomingKM != null && r.incomingKM !== '') ? +r.incomingKM : 0; }
 function effectiveKM(r) { const k = totalKM(r); return k != null ? k + remainKM(r) - inKM(r) : null; }
-function mileage(r)     { const e = effectiveKM(r); return (e != null && r.fuelQty) ? e / r.fuelQty : null; }
+function mileage(r) { const e = effectiveKM(r); return (e != null && r.fuelQty) ? e / r.fuelQty : null; }
 function overallAvgMileage() {
   const valid = data.filter(r => mileage(r) != null);
   if (!valid.length) return null;
@@ -102,79 +144,69 @@ function overallAvgMileage() {
 }
 
 /* ===================== FORMATTERS ===================== */
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const DOWS   = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-function fmtN(n, d=2) { return n == null ? '\u2014' : (+n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function fmtI(n)      { return n == null ? '\u2014' : Math.round(n).toLocaleString('en-IN'); }
-function fmtMon(n)    { return n == null ? '\u2014' : '\u20B9' + fmtN(n, 0); }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const DOWS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function fmtN(n, d = 2) { return n == null ? '—' : (+n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
+function fmtI(n) { return n == null ? '—' : Math.round(n).toLocaleString('en-IN'); }
+function fmtMon(n) { return n == null ? '—' : '₹' + fmtN(n, 0); }
 function fmtDate(d) {
-  if (!d) return '\u2014';
+  if (!d) return '—';
   const p = d.split('-');
   const dt = new Date(d + 'T00:00:00');
-  return '<div class="date-str">' + p[2] + '-' + MONTHS[+p[1]-1] + '-' + p[0].slice(2) + '</div>'
-       + '<div class="dow">' + DOWS[dt.getDay()] + '</div>';
+  return `<div class="date-str">${p[2]}-${MONTHS[+p[1] - 1]}-${p[0].slice(2)}</div><div class="dow">${DOWS[dt.getDay()]}</div>`;
 }
 
-/* ===================== RENDER ===================== */
+/* ===================== RENDER TABLE ===================== */
 function render() {
   const sorted = [...data].sort((a, b) => {
     let va, vb;
-    if (sortKey === 'totalKM')  { va = totalKM(a);  vb = totalKM(b); }
+    if (sortKey === 'totalKM') { va = totalKM(a); vb = totalKM(b); }
     else if (sortKey === 'mileage') { va = mileage(a); vb = mileage(b); }
     else { va = a[sortKey]; vb = b[sortKey]; }
     const nv = sortAsc ? Infinity : -Infinity;
-    va = va ?? nv; vb = vb ?? nv;
+    va = va ?? nv;
+    vb = vb ?? nv;
     return va < vb ? (sortAsc ? -1 : 1) : va > vb ? (sortAsc ? 1 : -1) : 0;
   });
 
-  document.querySelectorAll('thead th').forEach(th => {
-    th.classList.remove('sorted');
-    const ic = th.querySelector('.sort-icon');
-    if (ic) ic.innerHTML = '&#8645;';
-  });
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
   const ath = document.getElementById('th-' + sortKey);
-  if (ath) { ath.classList.add('sorted'); ath.querySelector('.sort-icon').innerHTML = sortAsc ? '&#9650;' : '&#9660;'; }
+  if (ath) ath.classList.add('sorted');
 
   const tbody = document.getElementById('tableBody');
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="13"><div class="empty-state"><p>No entries yet.</p><button class="btn btn-primary" onclick="openAdd()">Add First Entry</button></div></td></tr>';
+    tbody.innerHTML = '<tr><td colspan="13"><div style="text-align:center;padding:40px 20px;"><p style="color:var(--text-muted);margin-bottom:20px;">No entries yet.</p><button class="btn btn-primary" onclick="openAdd()">➕ Add First Entry</button></div></td></tr>';
     updateSummary();
     return;
   }
 
   tbody.innerHTML = sorted.map(r => {
-    const km  = totalKM(r);
+    const km = totalKM(r);
     const mil = mileage(r);
-    const milCell = mil == null ? '<span style="color:var(--text-light)">\u2014</span>'
-      : mil >= 15   ? '<span class="badge badge-green"><b>'  + fmtN(mil, 2) + '</b></span>'
-      : mil >= 12.5 ? '<span class="badge badge-blue"><b>'   + fmtN(mil, 2) + '</b></span>'
-      : mil >= 10   ? '<span class="badge badge-amber"><b>'  + fmtN(mil, 2) + '</b></span>'
-      :               '<span class="badge badge-red"><b>'    + fmtN(mil, 2) + '</b></span>';
-    const projCell = r.projected != null
-      ? '<span class="badge badge-blue">' + fmtI(r.projected) + ' km</span>'
-      : '<span style="color:var(--text-light)">\u2014</span>';
-    return '<tr>'
-      + '<td><div class="bunk-cell" title="' + r.bunk + '">' + r.bunk + '</div></td>'
-      + '<td>' + fmtDate(r.date) + '</td>'
-      + '<td class="num">' + fmtI(r.startKM) + '</td>'
-      + '<td class="num">' + (r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">\u2014</span>') + '</td>'
-      + '<td class="num">' + (km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">\u2014</span>') + '</td>'
-      + '<td>' + projCell + '</td>'
-      + '<td class="num">' + (r.incomingKM != null && r.incomingKM !== ''
-          ? '<span class="badge badge-blue" title="Range before filling here">&#8595; ' + fmtI(r.incomingKM) + ' km</span>'
-          : '<span style="color:var(--text-light)">\u2014</span>') + '</td>'
-      + '<td class="num">' + (r.remainingKM != null && r.remainingKM !== ''
-          ? '<span class="badge badge-amber" title="Range arriving at next pump">&#8593; ' + fmtI(r.remainingKM) + ' km</span>'
-          : '<span style="color:var(--text-light)">\u2014</span>') + '</td>'
-      + '<td class="num">' + fmtMon(r.fuelAmount) + '</td>'
-      + '<td class="num">' + fmtN(r.fuelRate, 2) + '</td>'
-      + '<td class="num">' + (r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '\u2014') + '</td>'
-      + '<td>' + milCell + '</td>'
-      + '<td><div class="actions">'      + '<button class="btn btn-icon-edit btn-sm" onclick="openEdit(\'' + r.id + '\')">'
-      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg> Edit</button>'
-      + '<button class="btn btn-icon-del btn-sm" onclick="openDelete(\'' + r.id + '\')">'
-      + '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/></svg> Del</button>'
-      + '</div></td></tr>';
+    const milCell = mil == null ? '<span style="color:var(--text-light)">—</span>'
+      : mil >= 15 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
+        : mil >= 12.5 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
+          : mil >= 10 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
+            : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
+
+    return `<tr>
+      <td><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
+      <td>${fmtDate(r.date)}</td>
+      <td class="num">${fmtI(r.startKM)}</td>
+      <td class="num">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
+      <td class="num">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num">${fmtMon(r.fuelAmount)}</td>
+      <td class="num">${fmtN(r.fuelRate, 2)}</td>
+      <td class="num">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
+      <td>${milCell}</td>
+      <td><div class="actions">
+        <button class="btn btn-icon-edit btn-sm" onclick="openEdit('${r.id}')">✏️</button>
+        <button class="btn btn-icon-del btn-sm" onclick="openDelete('${r.id}')">🗑️</button>
+      </div></td>
+    </tr>`;
   }).join('');
 
   document.getElementById('countLabel').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
@@ -184,16 +216,17 @@ function render() {
 
 function updateSummary() {
   const ta = data.reduce((s, r) => s + (r.fuelAmount || 0), 0);
-  const tl = data.reduce((s, r) => s + (r.fuelQty    || 0), 0);
-  const tk = data.reduce((s, r) => s + (totalKM(r)   || 0), 0);
+  const tl = data.reduce((s, r) => s + (r.fuelQty || 0), 0);
+  const tk = data.reduce((s, r) => s + (totalKM(r) || 0), 0);
   const am = overallAvgMileage();
   const ar = tl > 0 ? ta / tl : null;
+  
   document.getElementById('sumEntries').textContent = data.length;
-  document.getElementById('sumAmount').textContent  = fmtMon(ta);
-  document.getElementById('sumLitres').textContent  = fmtN(tl, 1) + ' L';
-  document.getElementById('sumKM').textContent      = fmtI(tk) + ' km';
-  document.getElementById('sumMileage').textContent = am ? fmtN(am, 2) + ' km/L' : '\u2014';
-  document.getElementById('sumRate').textContent    = ar ? '\u20B9' + fmtN(ar, 2) : '\u2014';
+  document.getElementById('sumAmount').textContent = fmtMon(ta);
+  document.getElementById('sumLitres').textContent = fmtN(tl, 1) + ' L';
+  document.getElementById('sumKM').textContent = fmtI(tk) + ' km';
+  document.getElementById('sumMileage').textContent = am ? fmtN(am, 2) + ' km/L' : '—';
+  document.getElementById('sumRate').textContent = ar ? '₹' + fmtN(ar, 2) : '—';
 }
 
 function rebuildBunkList() {
@@ -204,9 +237,9 @@ function rebuildBunkList() {
 /* ===================== FORM CALCULATIONS ===================== */
 function calcAll() {
   const amount = parseFloat(document.getElementById('f_amount').value);
-  const rate   = parseFloat(document.getElementById('f_rate').value);
-  const qEl    = document.getElementById('qtyDisplay');
-  const qHid   = document.getElementById('f_qty');
+  const rate = parseFloat(document.getElementById('f_rate').value);
+  const qEl = document.getElementById('qtyDisplay');
+  const qHid = document.getElementById('f_qty');
 
   let qty = null;
   if (amount > 0 && rate > 0) {
@@ -218,15 +251,19 @@ function calcAll() {
     qHid.value = '';
   }
 
-  // Auto-populate To KM when Adding (not editing) and user hasn't typed it manually
   const endKMEl = document.getElementById('f_endKM');
   const sk = parseFloat(document.getElementById('f_startKM').value);
   if (!editId && !endKMEl._userEdited && qty != null && !isNaN(sk)) {
     const avg = overallAvgMileage();
     if (avg) endKMEl.value = Math.round(sk + avg * qty);
   }
+  
+  calcTotalKM();
+}
 
-  const ek  = parseFloat(endKMEl.value);
+function calcTotalKM() {
+  const sk = parseFloat(document.getElementById('f_startKM').value);
+  const ek = parseFloat(document.getElementById('f_endKM').value);
   const rmv = parseFloat(document.getElementById('f_remainKM').value);
   const imv = parseFloat(document.getElementById('f_incomingKM').value);
   const tEl = document.getElementById('totalKMDisplay');
@@ -238,260 +275,210 @@ function calcAll() {
     const out = isNaN(rmv) ? 0 : rmv;
     const inc = isNaN(imv) ? 0 : imv;
     const eff = tkm + out - inc;
-    if (out > 0 || inc > 0) {
-      let expr = fmtI(tkm);
-      if (out > 0) expr += ' + ' + fmtI(out);
-      if (inc > 0) expr += ' \u2212 ' + fmtI(inc);
-      eEl.textContent = expr + ' = ' + fmtI(eff) + ' km';
-    } else {
-      eEl.textContent = fmtI(eff) + ' km (enter in/out range for accurate calc)';
-    }
+    let expr = fmtI(tkm);
+    if (out > 0) expr += ' + ' + fmtI(out);
+    if (inc > 0) expr += ' − ' + fmtI(inc);
+    eEl.textContent = expr + ' = ' + fmtI(eff) + ' km';
   } else {
     tEl.textContent = 'Enter From and To KM';
     eEl.textContent = 'Enter KM values above';
   }
-
-  const pf = document.getElementById('f_projected');
-  if (!pf._userEdited) {
-    const avg = overallAvgMileage();
-    if (qty && avg) { pf.placeholder = Math.round(qty * avg) + ' (suggested)'; }
-    else { pf.placeholder = 'Auto-suggested from avg mileage'; }
-  }
 }
 
-/* ===================== MODAL: ADD / EDIT ===================== */
+/* ===================== MODAL OPERATIONS ===================== */
 let editId = null;
 
 function openAdd() {
   editId = null;
-  document.getElementById('modalTitle').textContent = 'Add Fuel Entry';
-  document.getElementById('saveBtn').innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg> Add Entry';
+  document.getElementById('modalTitle').textContent = '➕ Add Fuel Entry';
+  document.getElementById('saveBtn').textContent = 'Add Entry';
   resetForm();
   document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
-  // Auto-fill From KM from the latest endKM in data
   const latest = data.slice().sort((a, b) => (b.endKM ?? 0) - (a.endKM ?? 0)).find(r => r.endKM != null);
   if (latest) {
     document.getElementById('f_startKM').value = latest.endKM;
-    calcAll(); // trigger To KM suggestion right away
+    calcAll();
   }
   document.getElementById('formOverlay').classList.add('open');
-  rebuildBunkList();
 }
 
 function openEdit(id) {
   const r = data.find(x => x.id === id);
   if (!r) return;
   editId = id;
-  document.getElementById('modalTitle').textContent = 'Edit Fuel Entry';
-  document.getElementById('saveBtn').innerHTML =
-    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Update Entry';
-  document.getElementById('f_bunk').value       = r.bunk        || '';
-  document.getElementById('f_date').value       = r.date        || '';
-  document.getElementById('f_amount').value     = r.fuelAmount  ?? '';
-  document.getElementById('f_rate').value       = r.fuelRate    ?? '';
-  document.getElementById('f_startKM').value    = r.startKM     ?? '';
-  const endKMEl = document.getElementById('f_endKM');
-  endKMEl.value = r.endKM ?? '';
-  endKMEl._userEdited = true; // editing: never auto-overwrite existing To KM
-  document.getElementById('f_incomingKM').value = r.incomingKM  ?? '';
-  document.getElementById('f_remainKM').value   = r.remainingKM ?? '';
-  const pf = document.getElementById('f_projected');
-  pf.value = r.projected ?? '';
-  pf._userEdited = r.projected != null;
+  document.getElementById('modalTitle').textContent = '✏️ Edit Fuel Entry';
+  document.getElementById('saveBtn').textContent = 'Update Entry';
+
+  document.getElementById('f_bunk').value = r.bunk || '';
+  document.getElementById('f_date').value = r.date || '';
+  document.getElementById('f_amount').value = r.fuelAmount ?? '';
+  document.getElementById('f_rate').value = r.fuelRate ?? '';
+  document.getElementById('f_startKM').value = r.startKM ?? '';
+  document.getElementById('f_endKM').value = r.endKM ?? '';
+  document.getElementById('f_incomingKM').value = r.incomingKM ?? '';
+  document.getElementById('f_remainKM').value = r.remainingKM ?? '';
+  document.getElementById('f_projected').value = r.projected ?? '';
+
   calcAll();
   document.getElementById('formOverlay').classList.add('open');
-  rebuildBunkList();
 }
 
-function closeModal() {
+function openDelete(id) {
+  deleteId = id;
+  document.getElementById('delOverlay').classList.add('open');
+}
+
+function confirmDelete() {
+  deleteEntry(deleteId);
+  closeDelete();
+}
+
+function closeDelete() {
+  document.getElementById('delOverlay').classList.remove('open');
+  deleteId = null;
+}
+
+function closeForm() {
   document.getElementById('formOverlay').classList.remove('open');
-  resetForm();
   editId = null;
 }
 
 function resetForm() {
   document.getElementById('entryForm').reset();
-  document.getElementById('qtyDisplay').textContent         = 'Enter amount and rate';
-  document.getElementById('totalKMDisplay').textContent     = 'Enter From and To KM';
-  document.getElementById('effectiveKMDisplay').textContent = 'Enter KM values above';
-  document.getElementById('f_qty').value = '';
-  const endKMEl = document.getElementById('f_endKM');
-  endKMEl.value = '';
-  endKMEl._userEdited = false; // allow auto-populate in Add mode
-  document.getElementById('f_incomingKM').value = '';
-  const pf = document.getElementById('f_projected');
-  pf._userEdited = false;
-  pf.placeholder = 'Auto-suggested from avg mileage';
+  document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
+  document.getElementById('qtyDisplay').textContent = '—';
+  document.getElementById('totalKMDisplay').textContent = '—';
+  document.getElementById('effectiveKMDisplay').textContent = '—';
 }
 
-// Lock To KM from auto-populate once user manually types it
-document.getElementById('f_endKM').addEventListener('input', function() {
-  this._userEdited = this.value !== '';
-});
+async function deleteEntry(id) {
+  const deleted = await deleteEntryAPI(id);
+  if (deleted) {
+    data = data.filter(e => e.id !== id);
+    render();
+  }
+}
 
-document.getElementById('f_projected').addEventListener('input', function() {
-  this._userEdited = this.value !== '';
-});
+/* ===================== SAVE FORM ===================== */
+async function saveFormData() {
+  const entry = {
+    bunk: document.getElementById('f_bunk').value,
+    date: document.getElementById('f_date').value,
+    startKM: parseFloat(document.getElementById('f_startKM').value) || null,
+    endKM: parseFloat(document.getElementById('f_endKM').value) || null,
+    incomingKM: parseFloat(document.getElementById('f_incomingKM').value) || null,
+    remainingKM: parseFloat(document.getElementById('f_remainKM').value) || null,
+    fuelAmount: parseFloat(document.getElementById('f_amount').value) || null,
+    fuelRate: parseFloat(document.getElementById('f_rate').value) || null,
+    fuelQty: parseFloat(document.getElementById('f_qty').value) || null,
+    projected: parseFloat(document.getElementById('f_projected').value) || null,
+  };
 
-/* ===================== SAVE ENTRY ===================== */
+  if (!entry.bunk || !entry.date) {
+    showToast('❌ Bunk name and date required', 'error');
+    return;
+  }
+
+  if (editId) {
+    entry.id = editId;
+    const updated = await updateEntryAPI(editId, entry);
+    if (updated) {
+      const idx = data.findIndex(e => e.id === editId);
+      if (idx >= 0) data[idx] = entry;
+      render();
+      closeForm();
+    }
+  } else {
+    entry.id = uid();
+    const saved = await addEntryAPI(entry);
+    if (saved) {
+      data.push(entry);
+      render();
+      closeForm();
+    }
+  }
+}
+
 function saveEntry(e) {
   if (e) e.preventDefault();
-  const bunk    = document.getElementById('f_bunk').value.trim();
-  const date    = document.getElementById('f_date').value;
-  const amount  = parseFloat(document.getElementById('f_amount').value);
-  const rate    = parseFloat(document.getElementById('f_rate').value);
-  const startKM = parseFloat(document.getElementById('f_startKM').value);
-  const endKMv  = document.getElementById('f_endKM').value;
-  const endKM   = endKMv !== '' ? parseFloat(endKMv) : null;
-  const incomingKMv = document.getElementById('f_incomingKM').value;
-  const incomingKM  = incomingKMv !== '' ? parseFloat(incomingKMv) : null;
-  const remainKMv   = document.getElementById('f_remainKM').value;
-  const remainingKM = remainKMv  !== '' ? parseFloat(remainKMv)  : null;
-  const projv  = document.getElementById('f_projected').value;
-  const qty    = parseFloat(document.getElementById('f_qty').value);
-
-  if (!bunk || !date || isNaN(amount) || isNaN(rate) || isNaN(startKM)) {
-    showToast('Fill all required fields.', 'error'); return;
-  }
-  if (endKM !== null && endKM < startKM) {
-    showToast('To KM cannot be less than From KM.', 'error'); return;
-  }
-
-  const finalQty = isNaN(qty) ? +(amount / rate).toFixed(4) : +qty.toFixed(4);
-  let projected = projv !== '' ? parseFloat(projv) : null;
-  if (projected == null) { const avg = overallAvgMileage(); if (avg) projected = Math.round(finalQty * avg); }
-
-  const entry = { bunk, date, startKM, endKM, incomingKM, remainingKM, fuelAmount: amount, fuelRate: rate, fuelQty: finalQty, projected };
-  if (editId) {
-    const idx = data.findIndex(r => r.id === editId);
-    if (idx > -1) data[idx] = { ...data[idx], ...entry };
-    showToast('Entry updated!', 'success');
-  } else {
-    data.push({ id: uid(), ...entry });
-    showToast('Entry added!', 'success');
-  }
-  persistData(data);
-  closeModal();
-  render();
+  saveFormData();
 }
 
-/* ===================== DELETE ===================== */
-let deleteId = null;
-function openDelete(id)  { deleteId = id; document.getElementById('delOverlay').classList.add('open'); }
-function closeDelete()   { deleteId = null; document.getElementById('delOverlay').classList.remove('open'); }
-function confirmDelete() {
-  if (!deleteId) return;
-  data = data.filter(r => r.id !== deleteId);
-  persistData(data);
-  closeDelete();
-  render();
-  showToast('Entry deleted.', 'success');
+function showToast(msg, type = 'info') {
+  const toast = document.getElementById('toast');
+  toast.textContent = msg;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(() => toast.classList.remove('show'), 3500);
 }
 
-function overlayClick(e, id) {
-  if (e.target.id === id) { id === 'formOverlay' ? closeModal() : closeDelete(); }
-}
-
-/* ===================== TOAST ===================== */
-let toastTimer;
-function showToast(msg, type = 'success') {
-  const t = document.getElementById('toast');
-  t.className = 'toast ' + type;
-  const ic = type === 'success'
-    ? '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>'
-    : '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>';
-  t.innerHTML = ic + msg;
-  t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
-}
-
-document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeModal(); closeDelete(); } });
-
-// Initialize on DOM ready
-function checkLoginScreen() {
-  const username = getUsername();
-  
-  // Always show login screen if not logged in
-  if (!username) {
-    showLoginScreen();
-  } else {
-    hideLoginScreen();
-    showMainContent();
-    initializeData();
+function overlayClick(e, overlayId) {
+  if (e.target.id === overlayId) {
+    if (overlayId === 'formOverlay') closeForm();
+    else if (overlayId === 'delOverlay') closeDelete();
   }
 }
 
-function showLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  const mainContent = document.getElementById('mainContent');
-  if (loginScreen) {
-    loginScreen.classList.remove('hidden');
-  }
-  if (mainContent) {
-    mainContent.style.display = 'none';
-  }
+function closeModal() {
+  closeForm();
 }
 
-function hideLoginScreen() {
-  const loginScreen = document.getElementById('loginScreen');
-  if (loginScreen) {
-    loginScreen.classList.add('hidden');
-  }
-}
-
-function showMainContent() {
-  const mainContent = document.getElementById('mainContent');
-  if (mainContent) {
-    mainContent.style.display = 'block';
-  }
-}
-
-function logout() {
-  if (confirm('Are you sure you want to logout?')) {
-    currentUsername = ''; // Clear session
-    showToast('Logged out successfully', 'success');
-    setTimeout(() => {
-      location.reload();
-    }, 1000);
-  }
+/* ===================== AUTHENTICATION ===================== */
+async function showApp(username) {
+  currentUsername = username;
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('mainContent').style.display = 'block';
+  initializeData();
 }
 
 function submitLogin() {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
   
-  if (!username) {
-    showToast('Please enter a username', 'error');
+  if (!username || !password) {
+    showToast('❌ Please enter username and password', 'error');
     return;
   }
   
-  if (!password) {
-    showToast('Please enter a password', 'error');
-    return;
+  if (username && password.length >= 4) {
+    localStorage.setItem('username', username);
+    showApp(username);
+  } else {
+    showToast('❌ Invalid credentials', 'error');
   }
-  
-  if (username.length < 3) {
-    showToast('Username must be at least 3 characters', 'error');
-    return;
-  }
-  
-  if (password.length < 4) {
-    showToast('Password must be at least 4 characters', 'error');
-    return;
-  }
-  
-  // Store username in session (not persisted)
-  currentUsername = username;
-  hideLoginScreen();
-  showMainContent();
-  showToast('Welcome ' + username + '!', 'success');
-  initializeData();
 }
 
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', checkLoginScreen);
-} else {
-  checkLoginScreen();
+function logout() {
+  if (confirm('Logout?')) {
+    localStorage.removeItem('username');
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+    currentUsername = '';
+  }
 }
+
+/* ===================== INIT ===================== */
+document.addEventListener('DOMContentLoaded', () => {
+  const username = localStorage.getItem('username');
+  if (username) {
+    showApp(username);
+  } else {
+    document.getElementById('loginScreen').classList.remove('hidden');
+  }
+  
+  const form = document.getElementById('entryForm');
+  if (form) {
+    form.addEventListener('change', (e) => {
+      if (e.target.id === 'f_endKM') {
+        document.getElementById('f_endKM')._userEdited = true;
+      }
+      calcAll();
+    });
+    form.addEventListener('input', (e) => {
+      if (e.target.id === 'f_amount' || e.target.id === 'f_rate' || e.target.id === 'f_startKM' || e.target.id === 'f_endKM') {
+        calcAll();
+      }
+    });
+  }
+});
