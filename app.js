@@ -478,7 +478,7 @@ function closeModal() {
 /* ===================== AUTHENTICATION ===================== */
 const AUTH_USERNAME = 'admin';
 const AUTH_SALT     = 'TN13AK8507';
-const AUTH_HASH     = 'd8f199fae6bd7b7700d857ad1f04a713a244fee8255c457dd6389377eabef399';
+const AUTH_HASH     = '8d5999c16cb017120735dde1fcb974307c25516404d18a9abd5afb2cf6b2d595'; // Titan1987 + salt
 
 async function hashPassword(password) {
   const data = new TextEncoder().encode(password + AUTH_SALT);
@@ -488,6 +488,11 @@ async function hashPassword(password) {
 
 async function showApp(username) {
   currentUsername = username;
+  // Save session credentials with expiration
+  const today = new Date().toISOString().slice(0, 10);
+  sessionStorage.setItem('loginUsername', username);
+  sessionStorage.setItem('loginDate', today);
+  // Password is not stored for security, but hash can be stored if needed
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('mainContent').style.display = 'block';
   initializeData();
@@ -504,6 +509,8 @@ async function submitLogin() {
 
   const hash = await hashPassword(password);
   if (username === AUTH_USERNAME && hash === AUTH_HASH) {
+    // Save password hash for session
+    sessionStorage.setItem('loginPasswordHash', hash);
     showApp(username);
   } else {
     showToast('❌ Invalid credentials', 'error');
@@ -517,13 +524,29 @@ function logout() {
     document.getElementById('loginUsername').value = '';
     document.getElementById('loginPassword').value = '';
     currentUsername = '';
+    sessionStorage.removeItem('loginUsername');
+    sessionStorage.removeItem('loginPasswordHash');
+    sessionStorage.removeItem('loginDate');
   }
 }
 
 /* ===================== INIT ===================== */
 document.addEventListener('DOMContentLoaded', () => {
+  // Auto-login if session is valid and not expired
+  const sessionUsername = sessionStorage.getItem('loginUsername');
+  const sessionHash = sessionStorage.getItem('loginPasswordHash');
+  const sessionDate = sessionStorage.getItem('loginDate');
+  const today = new Date().toISOString().slice(0, 10);
+  if (sessionUsername && sessionHash && sessionDate === today) {
+    // Validate hash matches static credentials
+    if (sessionUsername === AUTH_USERNAME && sessionHash === AUTH_HASH) {
+      showApp(sessionUsername);
+      return;
+    }
+  }
+  // Otherwise, show login screen
   document.getElementById('loginScreen').classList.remove('hidden');
-  
+
   const form = document.getElementById('entryForm');
   if (form) {
     form.addEventListener('change', (e) => {
