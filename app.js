@@ -4,9 +4,10 @@
 // IMPORTANT: Update this URL after deploying Google Apps Script
 // Deploy script from AppsScript.js at: https://script.google.com
 // Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0lhTUU2rzmk0oyXhVY2lFG56E6zRuXK9OgT1QKkWAtzLErg9Arl8S6corI6gxB1qO7A/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxGb6gz0affXpTGJ1x8x0xnrExJHjl7Y7xwlIVWDgnxZ-9cMlKR0v1jXAcmAz3IYPDQtg/exec';
 
 let currentUsername = '';
+let deleteId = null;
 function getUsername() { return currentUsername; }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
@@ -51,8 +52,21 @@ async function loadDataFromAPI() {
     console.log('📡 Fetching data from Google Sheets...');
     const result = await callAppsScript('get');
     if (result.success) {
-      const json = result.data || [];
+      let json = result.data || [];
       console.log('✓ Data loaded:', json.length, 'entries');
+      
+      // Normalize date format for all entries and fix timezone issues
+      if (Array.isArray(json)) {
+        json = json.map(entry => {
+          if (entry.date) {
+            const original = entry.date;
+            entry.date = normalizeDateString(entry.date);
+            console.log(`📅 Date normalized: "${original}" → "${entry.date}"`);
+          }
+          return entry;
+        });
+      }
+      
       return Array.isArray(json) ? json : [];
     }
     throw new Error(result.error || 'Failed to load data');
@@ -130,7 +144,17 @@ function sortBy(key) {
 }
 
 /* ===================== COMPUTED FIELDS ===================== */
-function totalKM(r) { return (r.endKM != null && r.endKM !== '') ? r.endKM - r.startKM : null; }
+function totalKM(r) {
+  if (r.endKM != null && r.endKM !== '') {
+    // Add 41 only for the first item in the data array
+    if (data.length && data[0] && r.id === data[0].id) {
+      return r.endKM - r.startKM + 41;
+    } else {
+      return r.endKM - r.startKM;
+    }
+  }
+  return null;
+}
 function remainKM(r) { return (r.remainingKM != null && r.remainingKM !== '') ? +r.remainingKM : 0; }
 function inKM(r) { return (r.incomingKM != null && r.incomingKM !== '') ? +r.incomingKM : 0; }
 function effectiveKM(r) { const k = totalKM(r); return k != null ? k + remainKM(r) - inKM(r) : null; }
@@ -146,13 +170,42 @@ function overallAvgMileage() {
 /* ===================== FORMATTERS ===================== */
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DOWS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Normalize date string - extract date and add 1 day to account for timezone shift
+function normalizeDateString(dateStr) {
+  if (!dateStr) return null;
+  
+  // Extract just the date part (YYYY-MM-DD) from any format
+  const datePart = dateStr.split('T')[0];
+  
+  // Parse the date and add 1 day
+  const date = new Date(datePart + 'T00:00:00');
+  date.setDate(date.getDate() + 1);
+  
+  // Format back to YYYY-MM-DD
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  
+  return `${year}-${month}-${day}`;
+}
 function fmtN(n, d = 2) { return n == null ? '—' : (+n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function fmtI(n) { return n == null ? '—' : Math.round(n).toLocaleString('en-IN'); }
 function fmtMon(n) { return n == null ? '—' : '₹' + fmtN(n, 0); }
 function fmtDate(d) {
   if (!d) return '—';
-  const p = d.split('-');
-  const dt = new Date(d + 'T00:00:00');
+  
+  // Normalize date: handle ISO timestamps or YYYY-MM-DD format
+  let dateStr = d;
+  if (d.includes('T')) {
+    // Extract just the date part from ISO timestamp (e.g., 2025-01-26T18:30:00.000Z -> 2025-01-26)
+    dateStr = d.split('T')[0];
+  }
+  
+  const p = dateStr.split('-');
+  if (p.length !== 3) return '—';
+  
+  const dt = new Date(dateStr + 'T00:00:00');
   return `<div class="date-str">${p[2]}-${MONTHS[+p[1] - 1]}-${p[0].slice(2)}</div><div class="dow">${DOWS[dt.getDay()]}</div>`;
 }
 
@@ -300,6 +353,7 @@ function openAdd() {
     calcAll();
   }
   document.getElementById('formOverlay').classList.add('open');
+  document.getElementById('f_bunk').focus();
 }
 
 function openEdit(id) {
@@ -321,6 +375,7 @@ function openEdit(id) {
 
   calcAll();
   document.getElementById('formOverlay').classList.add('open');
+  document.getElementById('f_bunk').focus();
 }
 
 function openDelete(id) {
@@ -349,6 +404,7 @@ function resetForm() {
   document.getElementById('qtyDisplay').textContent = '—';
   document.getElementById('totalKMDisplay').textContent = '—';
   document.getElementById('effectiveKMDisplay').textContent = '—';
+  document.getElementById('f_endKM')._userEdited = false;
 }
 
 async function deleteEntry(id) {
@@ -412,10 +468,7 @@ function showToast(msg, type = 'info') {
 }
 
 function overlayClick(e, overlayId) {
-  if (e.target.id === overlayId) {
-    if (overlayId === 'formOverlay') closeForm();
-    else if (overlayId === 'delOverlay') closeDelete();
-  }
+  // Intentionally disabled: modal only closes via close/cancel/update buttons
 }
 
 function closeModal() {
@@ -423,6 +476,16 @@ function closeModal() {
 }
 
 /* ===================== AUTHENTICATION ===================== */
+const AUTH_USERNAME = 'admin';
+const AUTH_SALT     = 'TN13AK8507';
+const AUTH_HASH     = 'd8f199fae6bd7b7700d857ad1f04a713a244fee8255c457dd6389377eabef399';
+
+async function hashPassword(password) {
+  const data = new TextEncoder().encode(password + AUTH_SALT);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 async function showApp(username) {
   currentUsername = username;
   document.getElementById('loginScreen').classList.add('hidden');
@@ -430,17 +493,17 @@ async function showApp(username) {
   initializeData();
 }
 
-function submitLogin() {
+async function submitLogin() {
   const username = document.getElementById('loginUsername').value.trim();
   const password = document.getElementById('loginPassword').value.trim();
-  
+
   if (!username || !password) {
     showToast('❌ Please enter username and password', 'error');
     return;
   }
-  
-  if (username === 'admin' && password === '1234') {
-    localStorage.setItem('username', username);
+
+  const hash = await hashPassword(password);
+  if (username === AUTH_USERNAME && hash === AUTH_HASH) {
     showApp(username);
   } else {
     showToast('❌ Invalid credentials', 'error');
@@ -449,7 +512,6 @@ function submitLogin() {
 
 function logout() {
   if (confirm('Logout?')) {
-    localStorage.removeItem('username');
     document.getElementById('loginScreen').classList.remove('hidden');
     document.getElementById('mainContent').style.display = 'none';
     document.getElementById('loginUsername').value = '';
@@ -460,12 +522,7 @@ function logout() {
 
 /* ===================== INIT ===================== */
 document.addEventListener('DOMContentLoaded', () => {
-  const username = localStorage.getItem('username');
-  if (username) {
-    showApp(username);
-  } else {
-    document.getElementById('loginScreen').classList.remove('hidden');
-  }
+  document.getElementById('loginScreen').classList.remove('hidden');
   
   const form = document.getElementById('entryForm');
   if (form) {
@@ -476,6 +533,9 @@ document.addEventListener('DOMContentLoaded', () => {
       calcAll();
     });
     form.addEventListener('input', (e) => {
+      if (e.target.id === 'f_endKM') {
+        document.getElementById('f_endKM')._userEdited = true;
+      }
       if (e.target.id === 'f_amount' || e.target.id === 'f_rate' || e.target.id === 'f_startKM' || e.target.id === 'f_endKM') {
         calcAll();
       }
