@@ -151,13 +151,9 @@
     <span class="header-meta">Fuel Log</span>
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
-    <button class="btn btn-primary" onclick="openAdd()" id="addEntryBtn">
+    <button class="btn btn-primary" onclick="openAdd()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
       Add Entry
-    </button>
-    <button class="btn btn-primary" onclick="switchToTrips()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
-      Trip Data
     </button>
     <button class="btn btn-cancel" onclick="logout()" style="min-height: 44px; padding: 10px 14px;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 16l4-4m0 0l-4-4m4 4H7m0 0a4 4 0 01-4-4V5a4 4 0 014-4h4m0 16v4m0-16V3"/></svg>
@@ -201,41 +197,6 @@
           </tr>
         </thead>
         <tbody id="tableBody"></tbody>
-      </table>
-    </div>
-  </div>
-</main>
-
-<!-- TRIP HISTORY VIEW -->
-<main id="tripContent" style="display: none;">
-  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-    <div style="display: flex; align-items: center; gap: 10px;">
-      <button class="btn btn-cancel" onclick="switchToHome()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back
-      </button>
-      <h1 style="margin: 0; font-size: 1.3rem;">Trip History</h1>
-    </div>
-    <button class="btn btn-primary" onclick="openAddTrip()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-      New Trip
-    </button>
-  </div>
-
-  <div class="table-card">
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Start KM</th>
-            <th>End KM</th>
-            <th>Distance</th>
-            <th>Notes</th>
-            <th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="tripTableBody"></tbody>
       </table>
     </div>
   </div>
@@ -358,74 +319,6 @@
     <div class="confirm-actions">
       <button class="btn btn-cancel" onclick="closeDelete()">Cancel</button>
       <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
-    </div>
-  </div>
-</div>
-
-<!-- TRIP ADD / EDIT MODAL -->
-<div class="overlay" id="tripFormOverlay">
-  <div class="modal">
-    <div class="modal-header">
-      <div class="modal-title" id="tripModalTitle">Add Trip</div>
-      <div class="modal-header-actions">
-        <button class="btn btn-sm btn-cancel" onclick="closeTripModal()">Cancel</button>
-        <button class="btn btn-sm btn-primary" onclick="saveTripEntry(event)" id="saveTripBtn">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-          Save Trip
-        </button>
-        <button class="modal-close" onclick="closeTripModal()">&#x2715;</button>
-      </div>
-    </div>
-    <div class="modal-body">
-      <form id="tripForm" onsubmit="saveTripEntry(event)">
-        <div class="form-grid">
-
-          <div class="field form-full">
-            <label>Date</label>
-            <input type="date" id="trip_date" required />
-          </div>
-
-          <div class="field">
-            <label>Start KM</label>
-            <input type="number" id="trip_startKM" placeholder="e.g. 5000" min="0" required oninput="calcTripDistance()" />
-          </div>
-
-          <div class="field">
-            <label>End KM</label>
-            <input type="number" id="trip_endKM" placeholder="e.g. 5150" min="0" required oninput="calcTripDistance()" />
-          </div>
-
-          <div class="field form-full">
-            <label>Distance (km) &#8212; Auto Calculated (End &#8722; Start)</label>
-            <div class="calc-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              <div><div class="cl">Distance</div><div class="cv" id="tripDistanceDisplay">0 km</div></div>
-            </div>
-            <input type="hidden" id="trip_distance" />
-          </div>
-
-          <div class="field form-full">
-            <label>Notes</label>
-            <input type="text" id="trip_notes" placeholder="e.g. Office to Home via Airport Road" />
-          </div>
-
-        </div>
-      </form>
-    </div>
-  </div>
-</div>
-
-<!-- TRIP DELETE CONFIRM -->
-<div class="overlay" id="tripDelOverlay">
-  <div class="confirm-modal">
-    <div class="confirm-icon">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6M9 6V4h6v2"/></svg>
-    </div>
-    <div class="confirm-title">Delete Trip?</div>
-    <div class="confirm-msg">This action cannot be undone.</div>
-    <div class="confirm-actions">
-      <button class="btn btn-cancel" onclick="closeTripDelete()">Cancel</button>
-      <button class="btn btn-danger" onclick="confirmTripDelete()">Delete</button>
     </div>
   </div>
 </div>
