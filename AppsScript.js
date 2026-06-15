@@ -11,27 +11,40 @@
 // 8. Copy the deployment URL and use it in frontend app.js
 
 const SHEET_ID = '1f6JYIwbuMC3dmIw--NzhRWJTFD-yqYrxkh8sQpYxUdk';
-const SHEET_NAME = 'Sheet1';
+const FUEL_SHEET_NAME = 'Sheet1';
+const TRIPS_SHEET_NAME = 'Trips';
 
-// Get spreadsheet and sheet
+// Get spreadsheet
 const ss = SpreadsheetApp.openById(SHEET_ID);
-const sheet = ss.getSheetByName(SHEET_NAME);
+
+// Helper to get sheet by name or create it
+function getOrCreateSheet(sheetName) {
+  let sheet = ss.getSheetByName(sheetName);
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    // Add headers based on sheet type
+    if (sheetName === TRIPS_SHEET_NAME) {
+      sheet.appendRow(['id', 'Date', 'StartKM', 'EndKM', 'Distance', 'Notes']);
+    }
+  }
+  return sheet;
+}
 
 // ============ UTILITY FUNCTIONS ============
 
-function getHeaders() {
+function getHeaders(sheet) {
   const range = sheet.getRange(1, 1, 1, sheet.getLastColumn());
   return range.getValues()[0];
 }
 
-function getAllData() {
+function getAllData(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return []; // Only header, no data
-  
+
   const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
   const values = range.getValues();
-  const headers = getHeaders();
-  
+  const headers = getHeaders(sheet);
+
   const data = [];
   for (const row of values) {
     if (!row[0]) continue; // Skip empty rows
@@ -55,9 +68,10 @@ function convertToRow(entry, headers) {
 // ============ CRUD OPERATIONS ============
 
 // CREATE - Add new entry
-function addEntry(entry) {
+function addEntry(entry, sheetName = FUEL_SHEET_NAME) {
   try {
-    const headers = getHeaders();
+    const sheet = getOrCreateSheet(sheetName);
+    const headers = getHeaders(sheet);
     entry.id = entry.id || Utilities.getUuid();
     const row = convertToRow(entry, headers);
     sheet.appendRow(row);
@@ -68,9 +82,10 @@ function addEntry(entry) {
 }
 
 // READ - Get all entries
-function getAllEntries() {
+function getAllEntries(sheetName = FUEL_SHEET_NAME) {
   try {
-    const data = getAllData();
+    const sheet = getOrCreateSheet(sheetName);
+    const data = getAllData(sheet);
     return { success: true, data };
   } catch (err) {
     return { success: false, error: err.message };
@@ -78,9 +93,10 @@ function getAllEntries() {
 }
 
 // READ - Get single entry by ID
-function getEntry(id) {
+function getEntry(id, sheetName = FUEL_SHEET_NAME) {
   try {
-    const data = getAllData();
+    const sheet = getOrCreateSheet(sheetName);
+    const data = getAllData(sheet);
     const entry = data.find(e => e.id === id);
     if (!entry) {
       return { success: false, error: 'Entry not found' };
@@ -92,11 +108,12 @@ function getEntry(id) {
 }
 
 // UPDATE - Update entry by ID
-function updateEntry(id, updates) {
+function updateEntry(id, updates, sheetName = FUEL_SHEET_NAME) {
   try {
+    const sheet = getOrCreateSheet(sheetName);
     const lastRow = sheet.getLastRow();
-    const headers = getHeaders();
-    
+    const headers = getHeaders(sheet);
+
     for (let i = 2; i <= lastRow; i++) {
       const row = sheet.getRange(i, 1, 1, headers.length).getValues()[0];
       if (row[0] === id) {
@@ -119,11 +136,12 @@ function updateEntry(id, updates) {
 }
 
 // DELETE - Delete entry by ID
-function deleteEntry(id) {
+function deleteEntry(id, sheetName = FUEL_SHEET_NAME) {
   try {
+    const sheet = getOrCreateSheet(sheetName);
     const lastRow = sheet.getLastRow();
-    const headers = getHeaders();
-    
+    const headers = getHeaders(sheet);
+
     for (let i = 2; i <= lastRow; i++) {
       const row = sheet.getRange(i, 1, 1, headers.length).getValues()[0];
       if (row[0] === id) {
@@ -138,23 +156,24 @@ function deleteEntry(id) {
 }
 
 // SAVE ALL DATA - Replace all entries (bulk operation)
-function saveAllData(dataArray) {
+function saveAllData(dataArray, sheetName = FUEL_SHEET_NAME) {
   try {
+    const sheet = getOrCreateSheet(sheetName);
     // Clear existing data (keep header)
     const lastRow = sheet.getLastRow();
     if (lastRow > 1) {
       sheet.deleteRows(2, lastRow - 1);
     }
-    
+
     // Add new rows
     if (dataArray.length > 0) {
-      const headers = getHeaders();
+      const headers = getHeaders(sheet);
       for (const entry of dataArray) {
         const row = convertToRow(entry, headers);
         sheet.appendRow(row);
       }
     }
-    
+
     return { success: true, message: 'Data saved', count: dataArray.length };
   } catch (err) {
     return { success: false, error: err.message };
@@ -166,25 +185,27 @@ function saveAllData(dataArray) {
 function doGet(e) {
   const action = e.parameter.action;
   const id = e.parameter.id;
-  
+  const sheetName = e.parameter.sheet || FUEL_SHEET_NAME;
+
   try {
     switch (action) {
       case 'get':
-        return sendResponse(getAllEntries());
+        return sendResponse(getAllEntries(sheetName));
       case 'getOne':
-        return sendResponse(getEntry(id));
+        return sendResponse(getEntry(id, sheetName));
       case 'status':
-        return sendResponse({ 
-          success: true, 
+        return sendResponse({
+          success: true,
           connected: true,
           spreadsheetId: SHEET_ID,
-          sheetName: SHEET_NAME,
-          message: 'Google Apps Script API connected' 
+          fuelSheet: FUEL_SHEET_NAME,
+          tripsSheet: TRIPS_SHEET_NAME,
+          message: 'Google Apps Script API connected'
         });
       default:
-        return sendResponse({ 
-          success: true, 
-          data: getAllData() 
+        return sendResponse({
+          success: true,
+          data: getAllData(getOrCreateSheet(sheetName))
         });
     }
   } catch (err) {
@@ -194,18 +215,19 @@ function doGet(e) {
 
 function doPost(e) {
   const action = e.parameter.action;
+  const sheetName = e.parameter.sheet || FUEL_SHEET_NAME;
   const payload = JSON.parse(e.postData.contents);
-  
+
   try {
     switch (action) {
       case 'add':
-        return sendResponse(addEntry(payload.entry));
+        return sendResponse(addEntry(payload.entry, sheetName));
       case 'update':
-        return sendResponse(updateEntry(payload.id, payload.updates));
+        return sendResponse(updateEntry(payload.id, payload.updates, sheetName));
       case 'delete':
-        return sendResponse(deleteEntry(payload.id));
+        return sendResponse(deleteEntry(payload.id, sheetName));
       case 'saveAll':
-        return sendResponse(saveAllData(payload.data));
+        return sendResponse(saveAllData(payload.data, sheetName));
       default:
         return sendResponse({ success: false, error: 'Unknown action' });
     }
