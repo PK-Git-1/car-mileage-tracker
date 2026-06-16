@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "wrangler deploy",
+    "build": "node -e \"const fs=require('fs');['index.html','app.js'].forEach(f=>fs.copyFileSync(f,'Deployment/'+f))\" && wrangler deploy",
     "dev": "wrangler dev"
   },
   "devDependencies": {
