@@ -24,7 +24,7 @@ function getOrCreateSheet(sheetName) {
     sheet = ss.insertSheet(sheetName);
     // Add headers based on sheet type
     if (sheetName === TRIPS_SHEET_NAME) {
-      sheet.appendRow(['id', 'Date', 'StartKM', 'EndKM', 'Distance', 'Notes']);
+      sheet.appendRow(['id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Notes']);
     }
   }
   return sheet;
