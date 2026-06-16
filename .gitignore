@@ -31,3 +31,10 @@ tmp/
 
 # Dev / old files (not needed for GitHub Pages)
 _dev/
+
+# wrangler files
+.wrangler
+.dev.vars*
+!.dev.vars.example
+.env*
+!.env.example
