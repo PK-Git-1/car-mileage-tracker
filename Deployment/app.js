@@ -568,6 +568,7 @@ function openEditTrip(id) {
   const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
   const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
   const distance = parseFloat(trip.Distance || trip.distance) || 0;
+  const toGoKM = parseFloat(trip.ToGoKM || trip.toGoKM) || 0;
   const tripDate = trip.Date || trip.date || '';
   const notes = trip.Notes || trip.notes || '';
 
@@ -576,6 +577,7 @@ function openEditTrip(id) {
   document.getElementById('trip_endKM').value = endKM;
   document.getElementById('trip_distance').value = distance;
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
+  document.getElementById('trip_toGoKM').value = toGoKM || '';
   document.getElementById('trip_notes').value = notes;
 
   document.getElementById('tripFormOverlay').classList.add('open');
@@ -614,9 +616,10 @@ async function saveTripEntry(e) {
   const startKM = parseFloat(document.getElementById('trip_startKM').value);
   const endKM = parseFloat(document.getElementById('trip_endKM').value);
   const distance = parseFloat(document.getElementById('trip_distance').value);
+  const toGoKM = parseFloat(document.getElementById('trip_toGoKM').value) || 0;
   const notes = document.getElementById('trip_notes').value.trim();
 
-  console.log('📝 Trip data to save:', { date, startKM, endKM, distance, notes });
+  console.log('📝 Trip data to save:', { date, startKM, endKM, distance, toGoKM, notes });
 
   if (!date || !startKM || !endKM) {
     showToast('❌ Date, Start KM, and End KM are required', 'error');
@@ -626,7 +629,7 @@ async function saveTripEntry(e) {
   try {
     if (tripEditId) {
       // Update existing trip - use capital letters to match sheet headers
-      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
+      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, ToGoKM: toGoKM, Notes: notes };
       const result = await callTripsAPI('update', { id: tripEditId, updates });
       if (result.success) {
         showToast('✓ Trip updated', 'success');
@@ -643,6 +646,7 @@ async function saveTripEntry(e) {
         StartKM: startKM,
         EndKM: endKM,
         Distance: distance,
+        ToGoKM: toGoKM,
         Notes: notes
       };
       console.log('📤 Sending to API:', newTrip);
@@ -695,7 +699,7 @@ function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
   if (trips.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
     return;
   }
 
@@ -710,6 +714,7 @@ function renderTrips() {
     const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
     const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
     const distance = parseFloat(trip.Distance || trip.distance) || 0;
+    const toGoKM = parseFloat(trip.ToGoKM || trip.toGoKM) || 0;
     const tripDate = trip.Date || trip.date || '';
     const notes = trip.Notes || trip.notes || '';
 
@@ -719,6 +724,7 @@ function renderTrips() {
       <td class="num">${startKM.toLocaleString()}</td>
       <td class="num">${endKM.toLocaleString()}</td>
       <td class="num"><strong>${distance}</strong> km</td>
+      <td class="num">${toGoKM ? toGoKM.toLocaleString() + ' km' : '—'}</td>
       <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${notes || '—'}</td>
       <td>
         <div class="actions">

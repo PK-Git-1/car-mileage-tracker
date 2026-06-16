@@ -233,6 +233,7 @@
             <th>Start KM</th>
             <th>End KM</th>
             <th>Distance</th>
+            <th>To Go KM</th>
             <th>Notes</th>
             <th>Actions</th>
           </tr>
@@ -406,7 +407,12 @@
             <input type="hidden" id="trip_distance" />
           </div>
 
-          <div class="field form-full">
+          <div class="field">
+            <label>To Go KM</label>
+            <input type="number" id="trip_toGoKM" placeholder="e.g. 300" min="0" />
+          </div>
+
+          <div class="field">
             <label>Notes</label>
             <input type="text" id="trip_notes" placeholder="e.g. Office to Home via Airport Road" />
           </div>
