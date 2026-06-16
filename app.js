@@ -524,7 +524,7 @@ async function callTripsAPI(action, payload = {}) {
 // Load trips from Google Sheets
 async function loadTrips() {
   document.getElementById('tripTableBody').innerHTML =
-    '<tr><td colspan="6"><div style="text-align:center;padding:48px 20px;">' +
+    '<tr><td colspan="7"><div style="text-align:center;padding:48px 20px;">' +
     '<div class="spinner"></div>' +
     '<p style="color:var(--text-muted);font-size:0.85rem;">Loading trips from Google Sheets…</p>' +
     '</div></td></tr>';
@@ -632,9 +632,9 @@ async function saveTripEntry(e) {
       const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, ToGoKM: toGoKM, Notes: notes };
       const result = await callTripsAPI('update', { id: tripEditId, updates });
       if (result.success) {
-        showToast('✓ Trip updated', 'success');
-        await loadTrips();
         closeTripModal();
+        showToast('✓ Trip updated', 'success');
+        loadTrips();
       } else {
         showToast('❌ Failed to update trip: ' + result.error, 'error');
       }
@@ -652,9 +652,9 @@ async function saveTripEntry(e) {
       console.log('📤 Sending to API:', newTrip);
       const result = await callTripsAPI('add', { entry: newTrip });
       if (result.success) {
-        showToast('✓ Trip added', 'success');
-        await loadTrips();
         closeTripModal();
+        showToast('✓ Trip added', 'success');
+        loadTrips();
       } else {
         showToast('❌ Failed to save trip: ' + result.error, 'error');
       }
