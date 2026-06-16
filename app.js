@@ -130,6 +130,11 @@ async function deleteEntryAPI(id) {
 let data = [];
 
 async function initializeData() {
+  document.getElementById('tableBody').innerHTML =
+    '<tr><td colspan="13"><div style="text-align:center;padding:48px 20px;">' +
+    '<div class="spinner"></div>' +
+    '<p style="color:var(--text-muted);font-size:0.85rem;">Loading data from Google Sheets…</p>' +
+    '</div></td></tr>';
   data = await loadDataFromAPI();
   console.log(`Loaded ${data.length} entries from Google Sheets`);
   render();
@@ -518,6 +523,11 @@ async function callTripsAPI(action, payload = {}) {
 
 // Load trips from Google Sheets
 async function loadTrips() {
+  document.getElementById('tripTableBody').innerHTML =
+    '<tr><td colspan="6"><div style="text-align:center;padding:48px 20px;">' +
+    '<div class="spinner"></div>' +
+    '<p style="color:var(--text-muted);font-size:0.85rem;">Loading trips from Google Sheets…</p>' +
+    '</div></td></tr>';
   try {
     console.log('📡 Loading trips from Google Sheets...');
     const result = await callTripsAPI('get');
