@@ -699,11 +699,10 @@ function renderTrips() {
     return;
   }
 
-  // Sort by date descending - handle both field name variations
   const sortedTrips = [...trips].sort((a, b) => {
-    const dateA = new Date(a.Date || a.date || '');
-    const dateB = new Date(b.Date || b.date || '');
-    return dateB - dateA;
+    const endA = parseFloat(a.EndKM || a.endKM) || 0;
+    const endB = parseFloat(b.EndKM || b.endKM) || 0;
+    return endB - endA;
   });
 
   tbody.innerHTML = sortedTrips.map(trip => {
