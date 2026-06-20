@@ -194,6 +194,21 @@ function normalizeDateString(dateStr) {
   
   return `${year}-${month}-${day}`;
 }
+
+// Format date for HTML date input (YYYY-MM-DD format)
+function formatDateForInput(dateStr) {
+  if (!dateStr) return '';
+  
+  // Extract just the date part (YYYY-MM-DD) from any format
+  const datePart = dateStr.split('T')[0];
+  
+  // Validate it's already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return datePart;
+  }
+  
+  return '';
+}
 function fmtN(n, d = 2) { return n == null ? '—' : (+n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function fmtI(n) { return n == null ? '—' : Math.round(n).toLocaleString('en-IN'); }
 function fmtMon(n) { return n == null ? '—' : '₹' + fmtN(n, 0); }
@@ -369,7 +384,7 @@ function openEdit(id) {
   document.getElementById('saveBtn').textContent = 'Update Entry';
 
   document.getElementById('f_bunk').value = r.bunk || '';
-  document.getElementById('f_date').value = r.date || '';
+  document.getElementById('f_date').value = formatDateForInput(r.date) || '';
   document.getElementById('f_amount').value = r.fuelAmount ?? '';
   document.getElementById('f_rate').value = r.fuelRate ?? '';
   document.getElementById('f_startKM').value = r.startKM ?? '';
@@ -565,6 +580,7 @@ function openEditTrip(id) {
   document.getElementById('saveTripBtn').textContent = '✓ Update Trip';
 
   // Handle both field name variations (capital and lowercase)
+  const fuelId = trip.Fuel_Id || trip.fuel_Id || '';
   const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
   const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
   const distance = parseFloat(trip.Distance || trip.distance) || 0;
@@ -572,7 +588,9 @@ function openEditTrip(id) {
   const tripDate = trip.Date || trip.date || '';
   const notes = trip.Notes || trip.notes || '';
 
-  document.getElementById('trip_date').value = tripDate;
+  // Use formatDateForInput to ensure proper YYYY-MM-DD format
+  document.getElementById('trip_fuelId').value = fuelId;
+  document.getElementById('trip_date').value = formatDateForInput(tripDate);
   document.getElementById('trip_startKM').value = startKM;
   document.getElementById('trip_endKM').value = endKM;
   document.getElementById('trip_distance').value = distance;

@@ -24,10 +24,24 @@ function getOrCreateSheet(sheetName) {
     sheet = ss.insertSheet(sheetName);
     // Add headers based on sheet type
     if (sheetName === TRIPS_SHEET_NAME) {
-      sheet.appendRow(['id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Notes']);
+      sheet.appendRow(['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Notes']);
     }
   }
   return sheet;
+}
+
+// Get the last fuel entry ID from Sheet1
+function getLastFuelId() {
+  try {
+    const sheet = getOrCreateSheet(FUEL_SHEET_NAME);
+    const lastRow = sheet.getLastRow();
+    if (lastRow < 2) return null; // Only header, no data
+
+    const row = sheet.getRange(lastRow, 1, 1, 1).getValues()[0];
+    return row[0] || null; // Return the id from the last row
+  } catch (err) {
+    return null;
+  }
 }
 
 // ============ UTILITY FUNCTIONS ============
@@ -73,6 +87,12 @@ function addEntry(entry, sheetName = FUEL_SHEET_NAME) {
     const sheet = getOrCreateSheet(sheetName);
     const headers = getHeaders(sheet);
     entry.id = entry.id || Utilities.getUuid();
+
+    // Auto-populate Fuel_Id for Trips sheet
+    if (sheetName === TRIPS_SHEET_NAME && !entry.Fuel_Id) {
+      entry.Fuel_Id = getLastFuelId();
+    }
+
     const row = convertToRow(entry, headers);
     sheet.appendRow(row);
     return { success: true, entry };
@@ -193,6 +213,9 @@ function doGet(e) {
         return sendResponse(getAllEntries(sheetName));
       case 'getOne':
         return sendResponse(getEntry(id, sheetName));
+      case 'getLastFuelId':
+        const lastId = getLastFuelId();
+        return sendResponse({ success: true, lastFuelId: lastId });
       case 'status':
         return sendResponse({
           success: true,

@@ -4,7 +4,7 @@
 // IMPORTANT: Update this URL after deploying Google Apps Script
 // Deploy script from AppsScript.js at: https://script.google.com
 // Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyar3sQCMxMTcmcKYUp5zZXTJ0mNVMFq_yEVn6y2fzVMmlyPisw5AydqReORzLa8Z6i6w/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznkoPeWFYdqd-Rw7Jo_bUR1yavYqBJ3FW3LPTiwniZkQwYeIQ3jlRknJwFJK-RbGMthA/exec';
 
 let currentUsername = '';
 let deleteId = null;
@@ -194,6 +194,21 @@ function normalizeDateString(dateStr) {
   
   return `${year}-${month}-${day}`;
 }
+
+// Format date for HTML date input (YYYY-MM-DD format)
+function formatDateForInput(dateStr) {
+  if (!dateStr) return '';
+  
+  // Extract just the date part (YYYY-MM-DD) from any format
+  const datePart = dateStr.split('T')[0];
+  
+  // Validate it's already in YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return datePart;
+  }
+  
+  return '';
+}
 function fmtN(n, d = 2) { return n == null ? '—' : (+n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function fmtI(n) { return n == null ? '—' : Math.round(n).toLocaleString('en-IN'); }
 function fmtMon(n) { return n == null ? '—' : '₹' + fmtN(n, 0); }
@@ -369,7 +384,7 @@ function openEdit(id) {
   document.getElementById('saveBtn').textContent = 'Update Entry';
 
   document.getElementById('f_bunk').value = r.bunk || '';
-  document.getElementById('f_date').value = r.date || '';
+  document.getElementById('f_date').value = formatDateForInput(r.date) || '';
   document.getElementById('f_amount').value = r.fuelAmount ?? '';
   document.getElementById('f_rate').value = r.fuelRate ?? '';
   document.getElementById('f_startKM').value = r.startKM ?? '';
@@ -547,11 +562,22 @@ async function loadTrips() {
 }
 
 // Open Add Trip modal
-function openAddTrip() {
+async function openAddTrip() {
   tripEditId = null;
   document.getElementById('tripModalTitle').textContent = 'Add Trip';
   document.getElementById('saveTripBtn').textContent = '✓ Save Trip';
   resetTripForm();
+
+  // Fetch and populate the latest Fuel ID
+  try {
+    const result = await callAppsScript('getLastFuelId');
+    if (result.success && result.lastFuelId) {
+      document.getElementById('trip_fuelId').value = result.lastFuelId;
+    }
+  } catch (err) {
+    console.error('Error fetching last fuel ID:', err.message);
+  }
+
   document.getElementById('tripFormOverlay').classList.add('open');
 }
 
@@ -565,6 +591,7 @@ function openEditTrip(id) {
   document.getElementById('saveTripBtn').textContent = '✓ Update Trip';
 
   // Handle both field name variations (capital and lowercase)
+  const fuelId = trip.Fuel_Id || trip.fuel_Id || '';
   const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
   const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
   const distance = parseFloat(trip.Distance || trip.distance) || 0;
@@ -572,7 +599,9 @@ function openEditTrip(id) {
   const tripDate = trip.Date || trip.date || '';
   const notes = trip.Notes || trip.notes || '';
 
-  document.getElementById('trip_date').value = tripDate;
+  // Use formatDateForInput to ensure proper YYYY-MM-DD format
+  document.getElementById('trip_fuelId').value = fuelId;
+  document.getElementById('trip_date').value = formatDateForInput(tripDate);
   document.getElementById('trip_startKM').value = startKM;
   document.getElementById('trip_endKM').value = endKM;
   document.getElementById('trip_distance').value = distance;
@@ -596,6 +625,7 @@ function resetTripForm() {
   document.getElementById('trip_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('tripDistanceDisplay').textContent = '0 km';
   document.getElementById('trip_distance').value = '0';
+  document.getElementById('trip_fuelId').value = '';
 }
 
 // Calculate distance
@@ -613,13 +643,15 @@ async function saveTripEntry(e) {
   if (e) e.preventDefault();
 
   const date = document.getElementById('trip_date').value;
+  const fuelId = document.getElementById('trip_fuelId').value.trim();
   const startKM = parseFloat(document.getElementById('trip_startKM').value);
   const endKM = parseFloat(document.getElementById('trip_endKM').value);
   const distance = parseFloat(document.getElementById('trip_distance').value);
-  const toGoKM = parseFloat(document.getElementById('trip_toGoKM').value) || 0;
+  const toGoKMValue = document.getElementById('trip_toGoKM').value.trim();
+  const toGoKM = toGoKMValue ? parseFloat(toGoKMValue) : null;
   const notes = document.getElementById('trip_notes').value.trim();
 
-  console.log('📝 Trip data to save:', { date, startKM, endKM, distance, toGoKM, notes });
+  console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, notes });
 
   if (!date || !startKM || !endKM) {
     showToast('❌ Date, Start KM, and End KM are required', 'error');
@@ -628,8 +660,9 @@ async function saveTripEntry(e) {
 
   try {
     if (tripEditId) {
-      // Update existing trip - use capital letters to match sheet headers
-      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, ToGoKM: toGoKM, Notes: notes };
+      // Update existing trip - use capital letters to match sheet headers (exclude Fuel_Id)
+      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
+      if (toGoKM !== null) updates.ToGoKM = toGoKM;
       const result = await callTripsAPI('update', { id: tripEditId, updates });
       if (result.success) {
         closeTripModal();
@@ -642,6 +675,7 @@ async function saveTripEntry(e) {
       // Add new trip - use capital letters to match sheet headers
       const newTrip = {
         id: uid(),
+        Fuel_Id: fuelId,
         Date: date,
         StartKM: startKM,
         EndKM: endKM,
