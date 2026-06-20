@@ -51,6 +51,16 @@ function getHeaders(sheet) {
   return range.getValues()[0];
 }
 
+// Sheets auto-converts date strings to Date objects, which JSON.stringify
+// serializes via toISOString() (UTC) — that shifts the day when the sheet's
+// timezone is ahead of UTC. Format dates as plain 'yyyy-MM-dd' strings instead.
+function formatCellValue(value, timeZone) {
+  if (value instanceof Date) {
+    return Utilities.formatDate(value, timeZone, 'yyyy-MM-dd');
+  }
+  return value;
+}
+
 function getAllData(sheet) {
   const lastRow = sheet.getLastRow();
   if (lastRow < 2) return []; // Only header, no data
@@ -58,13 +68,14 @@ function getAllData(sheet) {
   const range = sheet.getRange(2, 1, lastRow - 1, sheet.getLastColumn());
   const values = range.getValues();
   const headers = getHeaders(sheet);
+  const timeZone = ss.getSpreadsheetTimeZone();
 
   const data = [];
   for (const row of values) {
     if (!row[0]) continue; // Skip empty rows
     const entry = {};
     for (let i = 0; i < headers.length; i++) {
-      entry[headers[i]] = row[i];
+      entry[headers[i]] = formatCellValue(row[i], timeZone);
     }
     data.push(entry);
   }
@@ -133,6 +144,7 @@ function updateEntry(id, updates, sheetName = FUEL_SHEET_NAME) {
     const sheet = getOrCreateSheet(sheetName);
     const lastRow = sheet.getLastRow();
     const headers = getHeaders(sheet);
+    const timeZone = ss.getSpreadsheetTimeZone();
 
     for (let i = 2; i <= lastRow; i++) {
       const row = sheet.getRange(i, 1, 1, headers.length).getValues()[0];
@@ -140,7 +152,7 @@ function updateEntry(id, updates, sheetName = FUEL_SHEET_NAME) {
         // Found the entry
         const entry = {};
         for (let j = 0; j < headers.length; j++) {
-          entry[headers[j]] = row[j];
+          entry[headers[j]] = formatCellValue(row[j], timeZone);
         }
         // Merge updates
         Object.assign(entry, updates);

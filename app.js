@@ -4,7 +4,7 @@
 // IMPORTANT: Update this URL after deploying Google Apps Script
 // Deploy script from AppsScript.js at: https://script.google.com
 // Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyE5_UcH8Id-q25jzE67IuTsvtHO1LbzCjJfH3Qh-U9bwvULOzzd8KNtqv_OqVkYJnPog/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxmJpCuFho22A5EMWAITzEPHwO6rXCakb9MkX-cjVR0-4GFvyo5KCr3jD5qf_Iueqql9Q/exec';
 
 let currentUsername = '';
 let deleteId = null;
@@ -379,6 +379,10 @@ function openAdd() {
     document.getElementById('f_startKM').value = latest.endKM;
     calcAll();
   }
+  switchModalTab('details');
+  document.getElementById('tabBtnFuelTrips').disabled = true;
+  document.getElementById('fuelTripsContent').innerHTML =
+    '<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">Save this entry first to add trips.</p>';
   document.getElementById('formOverlay').classList.add('open');
   document.getElementById('f_bunk').focus();
 }
@@ -401,8 +405,63 @@ function openEdit(id) {
   document.getElementById('f_projected').value = r.projected ?? '';
 
   calcAll();
+  switchModalTab('details');
+  document.getElementById('tabBtnFuelTrips').disabled = false;
+  renderFuelTrips(id);
   document.getElementById('formOverlay').classList.add('open');
   document.getElementById('f_bunk').focus();
+}
+
+// Switch between Fuel Details and Trips tabs in the Fuel Entry modal
+function switchModalTab(tab) {
+  document.getElementById('tabPaneDetails').classList.toggle('active', tab === 'details');
+  document.getElementById('tabPaneTrips').classList.toggle('active', tab === 'trips');
+  document.getElementById('tabBtnFuelDetails').classList.toggle('active', tab === 'details');
+  document.getElementById('tabBtnFuelTrips').classList.toggle('active', tab === 'trips');
+  document.getElementById('saveBtn').disabled = tab === 'trips';
+  if (tab === 'trips' && editId) renderFuelTrips(editId);
+}
+
+// Render the trips linked to this fuel entry (matched via Fuel_Id) inside the Trips tab
+function renderFuelTrips(fuelId) {
+  const container = document.getElementById('fuelTripsContent');
+  const linkedTrips = trips.filter(t => String(t.Fuel_Id ?? t.fuel_Id ?? '') === String(fuelId));
+
+  if (linkedTrips.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">No trips recorded for this fuel entry.</p>';
+    return;
+  }
+
+  const sorted = linkedTrips.slice().sort((a, b) => {
+    const endA = parseFloat(a.EndKM || a.endKM) || 0;
+    const endB = parseFloat(b.EndKM || b.endKM) || 0;
+    return endB - endA;
+  });
+
+  container.innerHTML = `
+    <table class="fuel-trips-table">
+      <thead>
+        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        ${sorted.map(t => {
+          const tripDate = t.Date || t.date || '';
+          const startKM = parseFloat(t.StartKM || t.startKM) || 0;
+          const endKM = parseFloat(t.EndKM || t.endKM) || 0;
+          const distance = parseFloat(t.Distance || t.distance) || 0;
+          const toGoKM = t.ToGoKM !== undefined && t.ToGoKM !== null && t.ToGoKM !== '' ? parseFloat(t.ToGoKM) : (t.toGoKM !== undefined && t.toGoKM !== null && t.toGoKM !== '' ? parseFloat(t.toGoKM) : null);
+          const notes = t.Notes || t.notes || '';
+          return `<tr>
+            <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+            <td>${startKM.toLocaleString()}</td>
+            <td>${endKM.toLocaleString()}</td>
+            <td>${distance} km</td>
+            <td>${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+            <td>${notes || '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 }
 
 function openDelete(id) {
@@ -680,10 +739,24 @@ async function saveTripEntry(e) {
     return;
   }
 
+  // Fall back to the latest Fuel entry's id if Fuel_Id is missing/blank
+  let resolvedFuelId = fuelId;
+  if (!resolvedFuelId) {
+    try {
+      const result = await callAppsScript('getLastFuelId');
+      if (result.success && result.lastFuelId) {
+        resolvedFuelId = result.lastFuelId;
+        console.log('ℹ️ Fuel_Id was empty - using latest Fuel entry id:', resolvedFuelId);
+      }
+    } catch (err) {
+      console.error('Error fetching last fuel ID:', err.message);
+    }
+  }
+
   try {
     if (tripEditId) {
       // Update existing trip - match sheet headers exactly
-      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
+      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
       if (toGoKM !== null) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
@@ -701,7 +774,7 @@ async function saveTripEntry(e) {
       // Add new trip - use capital letters to match sheet headers
       const newTrip = {
         id: uid(),
-        Fuel_Id: fuelId,
+        Fuel_Id: resolvedFuelId,
         Date: date,
         StartKM: startKM,
         EndKM: endKM,
@@ -806,14 +879,38 @@ function switchToHome() {
   currentView = 'home';
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('tripContent').style.display = 'none';
+  document.getElementById('tripsToggleBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>Trip Data';
+  document.getElementById('addEntryBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add Entry';
 }
 
 function switchToTrips() {
   currentView = 'trips';
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('tripContent').style.display = 'block';
+  document.getElementById('tripsToggleBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back';
+  document.getElementById('addEntryBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>New Trip';
   // Use cached trips data - no need to reload every time
   renderTrips();
+}
+
+function handleAddClick() {
+  if (currentView === 'trips') {
+    openAddTrip();
+  } else {
+    openAdd();
+  }
+}
+
+function toggleTripsView() {
+  if (currentView === 'trips') {
+    switchToHome();
+  } else {
+    switchToTrips();
+  }
 }
 
 /* ===================== AUTHENTICATION ===================== */

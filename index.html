@@ -39,6 +39,7 @@
     .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 7px; border: none; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: background 0.15s, transform 0.1s; min-height: 44px; -webkit-user-select: none; user-select: none; }
     .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
     .btn-primary:hover { background: var(--primary-dark); }
     .btn-icon-edit { background: var(--primary-light); color: var(--primary); min-height: 36px; min-width: 36px; }
     .btn-icon-edit:hover { background: #dbeafe; }
@@ -82,6 +83,16 @@
     .modal-close { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; background: var(--bg); border-radius: 7px; cursor: pointer; font-size: 1rem; color: var(--text-muted); min-height: 44px; min-width: 44px; }
     .modal-close:hover { background: var(--border); color: var(--text); }
     .modal-body { padding: 16px 18px; }
+    .modal-tabs { display: flex; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--border); position: sticky; top: 60px; background: var(--card); z-index: 1; }
+    .modal-tab { padding: 10px 14px; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .modal-tab:hover { color: var(--text); }
+    .modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .modal-tab:disabled { color: var(--text-light); cursor: not-allowed; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .fuel-trips-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .fuel-trips-table th, .fuel-trips-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+    .fuel-trips-table th { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); }
     .modal-footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding-bottom: max(12px, calc(12px + env(safe-area-inset-bottom))); }
     .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
     .form-full { grid-column: 1 / -1; }
@@ -153,11 +164,11 @@
     <span class="header-meta">Fuel Log</span>
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
-    <button class="btn btn-primary" onclick="openAdd()" id="addEntryBtn">
+    <button class="btn btn-primary" onclick="handleAddClick()" id="addEntryBtn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
       Add Entry
     </button>
-    <button class="btn btn-primary" onclick="switchToTrips()">
+    <button class="btn btn-primary" id="tripsToggleBtn" onclick="toggleTripsView()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
       Trip Data
     </button>
@@ -212,16 +223,8 @@
 <main id="tripContent" style="display: none;">
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <button class="btn btn-cancel" onclick="switchToHome()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back
-      </button>
       <h1 style="margin: 0; font-size: 1.3rem;">Trip History</h1>
     </div>
-    <button class="btn btn-primary" onclick="openAddTrip()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-      New Trip
-    </button>
   </div>
 
   <div class="table-card">
@@ -258,7 +261,12 @@
         <button class="modal-close" onclick="closeModal()">&#x2715;</button>
       </div>
     </div>
+    <div class="modal-tabs">
+      <button type="button" class="modal-tab active" id="tabBtnFuelDetails" onclick="switchModalTab('details')">Fuel Details</button>
+      <button type="button" class="modal-tab" id="tabBtnFuelTrips" onclick="switchModalTab('trips')">Trips</button>
+    </div>
     <div class="modal-body">
+      <div class="tab-pane active" id="tabPaneDetails">
       <form id="entryForm" onsubmit="saveEntry(event)">
         <div class="form-grid">
 
@@ -346,6 +354,11 @@
 
         </div>
       </form>
+      </div>
+
+      <div class="tab-pane" id="tabPaneTrips">
+        <div id="fuelTripsContent"></div>
+      </div>
     </div>
   </div>
 </div>
