@@ -1,4 +1,8 @@
 'use strict';
+// Disable non-error console output in the UI build (keep errors visible)
+if (typeof console !== 'undefined') {
+  console.log = console.info = console.debug = console.warn = () => {};
+}
 
 /* ===================== STORAGE & API ===================== */
 // IMPORTANT: Update this URL after deploying Google Apps Script
