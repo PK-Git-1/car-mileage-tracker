@@ -4,7 +4,7 @@
 // IMPORTANT: Update this URL after deploying Google Apps Script
 // Deploy script from AppsScript.js at: https://script.google.com
 // Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbznkoPeWFYdqd-Rw7Jo_bUR1yavYqBJ3FW3LPTiwniZkQwYeIQ3jlRknJwFJK-RbGMthA/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyE5_UcH8Id-q25jzE67IuTsvtHO1LbzCjJfH3Qh-U9bwvULOzzd8KNtqv_OqVkYJnPog/exec';
 
 let currentUsername = '';
 let deleteId = null;
@@ -34,11 +34,21 @@ async function callAppsScript(action, payload = {}) {
       };
     }
     
+    console.log(`🔗 Calling API: ${action} | URL: ${url.toString()}`);
     const response = await fetch(url.toString(), options);
+    
+    console.log(`📨 Response Status: ${response.status} ${response.statusText}`);
+    console.log(`📨 Response Headers:`, response.headers);
+    
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const text = await response.text();
+      console.error(`❌ Response Body: ${text}`);
+      throw new Error(`API Error ${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log(`✅ API Response:`, data);
+    return data;
   } catch (err) {
     console.error(`❌ API Error (${action}):`, err.message);
     showToast(`❌ Connection error: ${err.message}`, 'error');
@@ -181,18 +191,15 @@ function normalizeDateString(dateStr) {
   if (!dateStr) return null;
   
   // Extract just the date part (YYYY-MM-DD) from any format
+  // NO timezone manipulation - keep dates as-is
   const datePart = dateStr.split('T')[0];
   
-  // Parse the date and add 1 day
-  const date = new Date(datePart + 'T00:00:00');
-  date.setDate(date.getDate() + 1);
+  // Validate it's YYYY-MM-DD format
+  if (/^\d{4}-\d{2}-\d{2}$/.test(datePart)) {
+    return datePart;
+  }
   
-  // Format back to YYYY-MM-DD
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  
-  return `${year}-${month}-${day}`;
+  return null;
 }
 
 // Format date for HTML date input (YYYY-MM-DD format)
@@ -524,27 +531,38 @@ async function callTripsAPI(action, payload = {}) {
       };
     }
 
+    console.log(`🔗 Calling Trips API: ${action} | URL: ${url.toString()}`);
     const response = await fetch(url.toString(), options);
+    
+    console.log(`📨 Response Status: ${response.status} ${response.statusText}`);
+    console.log(`📨 Response Headers:`, response.headers);
+    
     if (!response.ok) {
-      throw new Error(`API Error: ${response.status}`);
+      const text = await response.text();
+      console.error(`❌ Response Body: ${text}`);
+      throw new Error(`API Error ${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
     }
-    return await response.json();
+    
+    const data = await response.json();
+    console.log(`✅ Trips API Response:`, data);
+    return data;
   } catch (err) {
-    console.error(`❌ API Error (${action}):`, err.message);
+    console.error(`❌ Trips API Error (${action}):`, err.message);
     showToast(`❌ Error: ${err.message}`, 'error');
     throw err;
   }
 }
 
 // Load trips from Google Sheets
+// Load trips from Google Sheets (called once on app init, then after add/edit/delete)
 async function loadTrips() {
   document.getElementById('tripTableBody').innerHTML =
     '<tr><td colspan="7"><div style="text-align:center;padding:48px 20px;">' +
     '<div class="spinner"></div>' +
-    '<p style="color:var(--text-muted);font-size:0.85rem;">Loading trips from Google Sheets…</p>' +
+    '<p style="color:var(--text-muted);font-size:0.85rem;">Refreshing trips…</p>' +
     '</div></td></tr>';
   try {
-    console.log('📡 Loading trips from Google Sheets...');
+    console.log('📡 Refreshing trips from Google Sheets...');
     const result = await callTripsAPI('get');
     if (result.success) {
       trips = result.data || [];
@@ -555,7 +573,7 @@ async function loadTrips() {
     }
   } catch (err) {
     console.error('❌ Error loading trips:', err.message);
-    showToast('⚠️ Failed to load trips. Check connection.', 'error');
+    showToast('⚠️ Failed to refresh trips. Check connection.', 'error');
     trips = [];
     renderTrips();
   }
@@ -606,7 +624,9 @@ function openEditTrip(id) {
   document.getElementById('trip_endKM').value = endKM;
   document.getElementById('trip_distance').value = distance;
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
-  document.getElementById('trip_toGoKM').value = toGoKM || '';
+  // For toGoKM: only use empty string if it's actually 0, otherwise show the value
+  document.getElementById('trip_toGoKM').value = toGoKM > 0 ? toGoKM : '';
+  console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
   document.getElementById('trip_notes').value = notes;
 
   document.getElementById('tripFormOverlay').classList.add('open');
@@ -626,6 +646,7 @@ function resetTripForm() {
   document.getElementById('tripDistanceDisplay').textContent = '0 km';
   document.getElementById('trip_distance').value = '0';
   document.getElementById('trip_fuelId').value = '';
+  document.getElementById('trip_toGoKM').value = '';
 }
 
 // Calculate distance
@@ -648,10 +669,11 @@ async function saveTripEntry(e) {
   const endKM = parseFloat(document.getElementById('trip_endKM').value);
   const distance = parseFloat(document.getElementById('trip_distance').value);
   const toGoKMValue = document.getElementById('trip_toGoKM').value.trim();
-  const toGoKM = toGoKMValue ? parseFloat(toGoKMValue) : null;
+  const toGoKM = toGoKMValue !== '' ? parseFloat(toGoKMValue) : null;
   const notes = document.getElementById('trip_notes').value.trim();
 
   console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, notes });
+  console.log('🔍 toGoKM details - Raw value:', document.getElementById('trip_toGoKM').value, '| Trimmed:', toGoKMValue, '| Parsed:', toGoKM);
 
   if (!date || !startKM || !endKM) {
     showToast('❌ Date, Start KM, and End KM are required', 'error');
@@ -660,9 +682,13 @@ async function saveTripEntry(e) {
 
   try {
     if (tripEditId) {
-      // Update existing trip - use capital letters to match sheet headers (exclude Fuel_Id)
+      // Update existing trip - match sheet headers exactly
       const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
-      if (toGoKM !== null) updates.ToGoKM = toGoKM;
+      if (toGoKM !== null) {
+        updates.ToGoKM = toGoKM;
+        console.log('✏️ Updating ToGoKM:', toGoKM);
+      }
+      console.log('📤 API Update payload:', updates);
       const result = await callTripsAPI('update', { id: tripEditId, updates });
       if (result.success) {
         closeTripModal();
@@ -683,7 +709,7 @@ async function saveTripEntry(e) {
         ToGoKM: toGoKM,
         Notes: notes
       };
-      console.log('📤 Sending to API:', newTrip);
+      console.log('📤 API Add payload:', newTrip);
       const result = await callTripsAPI('add', { entry: newTrip });
       if (result.success) {
         closeTripModal();
@@ -728,7 +754,7 @@ async function confirmTripDelete() {
   }
 }
 
-// Render Trips Table
+// Render Trips Table (uses cached trips data from memory)
 function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
@@ -748,7 +774,7 @@ function renderTrips() {
     const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
     const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
     const distance = parseFloat(trip.Distance || trip.distance) || 0;
-    const toGoKM = parseFloat(trip.ToGoKM || trip.toGoKM) || 0;
+    const toGoKM = trip.ToGoKM !== undefined && trip.ToGoKM !== null && trip.ToGoKM !== '' ? parseFloat(trip.ToGoKM) : (trip.toGoKM !== undefined && trip.toGoKM !== null && trip.toGoKM !== '' ? parseFloat(trip.toGoKM) : null);
     const tripDate = trip.Date || trip.date || '';
     const notes = trip.Notes || trip.notes || '';
 
@@ -758,7 +784,7 @@ function renderTrips() {
       <td class="num">${startKM.toLocaleString()}</td>
       <td class="num">${endKM.toLocaleString()}</td>
       <td class="num"><strong>${distance}</strong> km</td>
-      <td class="num">${toGoKM ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+      <td class="num">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
       <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${notes || '—'}</td>
       <td>
         <div class="actions">
@@ -786,7 +812,8 @@ function switchToTrips() {
   currentView = 'trips';
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('tripContent').style.display = 'block';
-  loadTrips();
+  // Use cached trips data - no need to reload every time
+  renderTrips();
 }
 
 /* ===================== AUTHENTICATION ===================== */
@@ -812,7 +839,8 @@ async function showApp(username) {
   document.getElementById('tripContent').style.display = 'none';
   currentView = 'home';
   initializeData();
-  loadTrips(); // Load trips from localStorage
+  // Load trips once on app initialization (data is cached and reused until add/edit/delete)
+  loadTrips();
 }
 
 async function submitLogin() {
