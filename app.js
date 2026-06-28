@@ -274,19 +274,19 @@ function render() {
             : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
 
     return `<tr>
-      <td><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
-      <td>${fmtDate(r.date)}</td>
-      <td class="num">${fmtI(r.startKM)}</td>
-      <td class="num">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
-      <td class="num">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${fmtMon(r.fuelAmount)}</td>
-      <td class="num">${fmtN(r.fuelRate, 2)}</td>
-      <td class="num">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
-      <td>${milCell}</td>
-      <td><div class="actions">
+      <td data-label="Petrol Bunk"><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
+      <td data-label="Date">${fmtDate(r.date)}</td>
+      <td class="num" data-label="From KM">${fmtI(r.startKM)}</td>
+      <td class="num" data-label="To KM">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Total KM">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td data-label="Projected (km)"><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
+      <td class="num" data-label="Pre-fill KM">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Post-trip KM">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Amount">${fmtMon(r.fuelAmount)}</td>
+      <td class="num" data-label="Fuel Rate">${fmtN(r.fuelRate, 2)}</td>
+      <td class="num" data-label="Petrol (L)">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
+      <td data-label="Mileage">${milCell}</td>
+      <td class="cell-actions" data-label="Actions"><div class="actions">
         <button class="btn btn-icon-edit btn-sm" onclick="openEdit('${r.id}')">✏️</button>
         <button class="btn btn-icon-del btn-sm" onclick="openDelete('${r.id}')">🗑️</button>
       </div></td>
@@ -571,6 +571,7 @@ let trips = [];
 let currentView = 'home'; // 'home' or 'trips'
 let tripEditId = null;
 let tripDeleteId = null;
+let lastTripToGoKM = null; // ToGoKM from the most recent trip, used to auto-populate new entries
 
 // API call helper for trips
 async function callTripsAPI(action, payload = {}) {
@@ -649,6 +650,22 @@ async function openAddTrip() {
   document.getElementById('saveTripBtn').textContent = '✓ Save Trip';
   resetTripForm();
 
+  // Auto-populate Start KM and To Go KM from the most recent trip
+  const latestTrip = trips.slice().sort((a, b) => {
+    const endA = parseFloat(a.EndKM || a.endKM) || 0;
+    const endB = parseFloat(b.EndKM || b.endKM) || 0;
+    return endB - endA;
+  }).find(t => (parseFloat(t.EndKM || t.endKM) || 0) > 0);
+  if (latestTrip) {
+    document.getElementById('trip_startKM').value = parseFloat(latestTrip.EndKM || latestTrip.endKM) || '';
+    const prevToGoKM = parseFloat(latestTrip.ToGoKM || latestTrip.toGoKM);
+    lastTripToGoKM = !isNaN(prevToGoKM) ? prevToGoKM : null;
+  } else {
+    lastTripToGoKM = null;
+  }
+  document.getElementById('trip_toGoKM')._userEdited = false;
+  calcTripDistance();
+
   // Fetch and populate the latest Fuel ID
   try {
     const result = await callAppsScript('getLastFuelId');
@@ -689,6 +706,7 @@ function openEditTrip(id) {
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
   // For toGoKM: only use empty string if it's actually 0, otherwise show the value
   document.getElementById('trip_toGoKM').value = toGoKM > 0 ? toGoKM : '';
+  document.getElementById('trip_toGoKM')._userEdited = true;
   console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
   document.getElementById('trip_notes').value = notes;
 
@@ -710,6 +728,7 @@ function resetTripForm() {
   document.getElementById('trip_distance').value = '0';
   document.getElementById('trip_fuelId').value = '';
   document.getElementById('trip_toGoKM').value = '';
+  document.getElementById('trip_toGoKM')._userEdited = false;
 }
 
 // Calculate distance
@@ -720,6 +739,13 @@ function calcTripDistance() {
 
   document.getElementById('trip_distance').value = distance;
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
+
+  // Auto-update To Go KM (previous trip's remaining km minus this trip's distance),
+  // unless the user has manually edited the field
+  const toGoKMEl = document.getElementById('trip_toGoKM');
+  if (!toGoKMEl._userEdited && lastTripToGoKM != null) {
+    toGoKMEl.value = Math.max(0, lastTripToGoKM - distance);
+  }
 }
 
 // Save Trip Entry
@@ -857,13 +883,13 @@ function renderTrips() {
 
     return `
     <tr>
-      <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-      <td class="num">${startKM.toLocaleString()}</td>
-      <td class="num">${endKM.toLocaleString()}</td>
-      <td class="num"><strong>${distance}</strong> km</td>
-      <td class="num">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
-      <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${notes || '—'}</td>
-      <td>
+      <td data-label="Date">${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+      <td class="num" data-label="Start KM">${startKM.toLocaleString()}</td>
+      <td class="num" data-label="End KM">${endKM.toLocaleString()}</td>
+      <td class="num" data-label="Distance"><strong>${distance}</strong> km</td>
+      <td class="num" data-label="To Go KM">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+      <td class="notes-cell" data-label="Notes">${notes || '—'}</td>
+      <td class="cell-actions" data-label="Actions">
         <div class="actions">
           <button class="btn btn-sm btn-icon-edit" onclick="openEditTrip('${trip.id}')" title="Edit">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1009,6 +1035,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (e.target.id === 'f_amount' || e.target.id === 'f_rate' || e.target.id === 'f_startKM' || e.target.id === 'f_endKM') {
         calcAll();
+      }
+    });
+  }
+
+  const tripForm = document.getElementById('tripForm');
+  if (tripForm) {
+    tripForm.addEventListener('input', (e) => {
+      if (e.target.id === 'trip_toGoKM') {
+        e.target._userEdited = true;
       }
     });
   }
