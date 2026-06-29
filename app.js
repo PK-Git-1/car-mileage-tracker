@@ -348,24 +348,13 @@ function calcAll() {
 function calcTotalKM() {
   const sk = parseFloat(document.getElementById('f_startKM').value);
   const ek = parseFloat(document.getElementById('f_endKM').value);
-  const rmv = parseFloat(document.getElementById('f_remainKM').value);
-  const imv = parseFloat(document.getElementById('f_incomingKM').value);
   const tEl = document.getElementById('totalKMDisplay');
-  const eEl = document.getElementById('effectiveKMDisplay');
 
   if (!isNaN(sk) && !isNaN(ek) && ek >= sk) {
     const tkm = ek - sk;
     tEl.textContent = fmtI(tkm) + ' km';
-    const out = isNaN(rmv) ? 0 : rmv;
-    const inc = isNaN(imv) ? 0 : imv;
-    const eff = tkm + out - inc;
-    let expr = fmtI(tkm);
-    if (out > 0) expr += ' + ' + fmtI(out);
-    if (inc > 0) expr += ' − ' + fmtI(inc);
-    eEl.textContent = expr + ' = ' + fmtI(eff) + ' km';
   } else {
     tEl.textContent = 'Enter From and To KM';
-    eEl.textContent = 'Enter KM values above';
   }
 }
 
@@ -493,7 +482,6 @@ function resetForm() {
   document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('qtyDisplay').textContent = '—';
   document.getElementById('totalKMDisplay').textContent = '—';
-  document.getElementById('effectiveKMDisplay').textContent = '—';
   document.getElementById('f_endKM')._userEdited = false;
 }
 
@@ -708,6 +696,8 @@ function openEditTrip(id) {
   document.getElementById('trip_toGoKM').value = toGoKM > 0 ? toGoKM : '';
   document.getElementById('trip_toGoKM')._userEdited = true;
   console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
+  const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? trip.Diff : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? trip.diff : '');
+  document.getElementById('trip_diff').value = diff;
   document.getElementById('trip_notes').value = notes;
 
   document.getElementById('tripFormOverlay').classList.add('open');
@@ -729,6 +719,7 @@ function resetTripForm() {
   document.getElementById('trip_fuelId').value = '';
   document.getElementById('trip_toGoKM').value = '';
   document.getElementById('trip_toGoKM')._userEdited = false;
+  document.getElementById('trip_diff').value = '';
 }
 
 // Calculate distance
@@ -759,9 +750,11 @@ async function saveTripEntry(e) {
   const distance = parseFloat(document.getElementById('trip_distance').value);
   const toGoKMValue = document.getElementById('trip_toGoKM').value.trim();
   const toGoKM = toGoKMValue !== '' ? parseFloat(toGoKMValue) : null;
+  const diffValue = document.getElementById('trip_diff').value.trim();
+  const diff = diffValue !== '' ? parseFloat(diffValue) : null;
   const notes = document.getElementById('trip_notes').value.trim();
 
-  console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, notes });
+  console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, diff, notes });
   console.log('🔍 toGoKM details - Raw value:', document.getElementById('trip_toGoKM').value, '| Trimmed:', toGoKMValue, '| Parsed:', toGoKM);
 
   if (!date || !startKM || !endKM) {
@@ -791,6 +784,10 @@ async function saveTripEntry(e) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
       }
+      if (diff !== null) {
+        updates.Diff = diff;
+        console.log('✏️ Updating Diff:', diff);
+      }
       console.log('📤 API Update payload:', updates);
       const result = await callTripsAPI('update', { id: tripEditId, updates });
       if (result.success) {
@@ -810,6 +807,7 @@ async function saveTripEntry(e) {
         EndKM: endKM,
         Distance: distance,
         ToGoKM: toGoKM,
+        Diff: diff,
         Notes: notes
       };
       console.log('📤 API Add payload:', newTrip);
@@ -857,12 +855,18 @@ async function confirmTripDelete() {
   }
 }
 
+// Color-coded badge for the Diff column, indicating mileage saved/lost
+function diffBadge(diff) {
+  const badgeClass = diff <= 0 ? 'badge-green' : diff <= 5 ? 'badge-amber' : diff < 10 ? 'badge-orange' : 'badge-red';
+  return `<span class="badge ${badgeClass}">${diff.toLocaleString()}</span>`;
+}
+
 // Render Trips Table (uses cached trips data from memory)
 function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
   if (trips.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
     return;
   }
 
@@ -878,6 +882,7 @@ function renderTrips() {
     const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
     const distance = parseFloat(trip.Distance || trip.distance) || 0;
     const toGoKM = trip.ToGoKM !== undefined && trip.ToGoKM !== null && trip.ToGoKM !== '' ? parseFloat(trip.ToGoKM) : (trip.toGoKM !== undefined && trip.toGoKM !== null && trip.toGoKM !== '' ? parseFloat(trip.toGoKM) : null);
+    const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? parseFloat(trip.Diff) : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? parseFloat(trip.diff) : null);
     const tripDate = trip.Date || trip.date || '';
     const notes = trip.Notes || trip.notes || '';
 
@@ -888,6 +893,7 @@ function renderTrips() {
       <td class="num" data-label="End KM">${endKM.toLocaleString()}</td>
       <td class="num" data-label="Distance"><strong>${distance}</strong> km</td>
       <td class="num" data-label="To Go KM">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+      <td class="num" data-label="Diff">${diff !== null ? diffBadge(diff) : '—'}</td>
       <td class="notes-cell" data-label="Notes">${notes || '—'}</td>
       <td class="cell-actions" data-label="Actions">
         <div class="actions">

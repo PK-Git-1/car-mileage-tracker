@@ -72,6 +72,7 @@
     .badge-green { background: var(--success-light); color: var(--success); }
     .badge-blue  { background: var(--primary-light);  color: var(--primary); }
     .badge-amber { background: #fffbeb;               color: var(--warning); }
+    .badge-orange { background: #fff7ed;               color: #ea580c; }
     .badge-red   { background: var(--danger-light);   color: var(--danger); }
     .actions { display: flex; gap: 6px; }
     .overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 200; align-items: center; justify-content: center; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
@@ -155,20 +156,9 @@
       .file-name { max-width: 120px; }
       .header-meta { display: none; }
 
-      /* Card-style tables instead of horizontal-scrolling rows */
-      .table-wrapper { overflow-x: visible; }
-      .table-card table, .table-card thead, .table-card tbody, .table-card th, .table-card td, .table-card tr { display: block; }
-      .table-card thead tr { position: absolute; top: -9999px; left: -9999px; }
-      .table-card tbody tr { border: 1px solid var(--border); border-radius: var(--radius); margin: 10px; padding: 4px 12px; }
-      .table-card tbody tr:hover { background: var(--card); }
-      .table-card td { border: none; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 9px 2px; white-space: normal; text-align: right; }
-      .table-card td:last-child { border-bottom: none; }
-      .table-card td::before { content: attr(data-label); font-weight: 700; font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); text-align: left; flex-shrink: 0; }
-      .table-card td[colspan] { display: block; text-align: left; }
-      .table-card td[colspan]::before { content: none; }
-      .table-card td.cell-actions { justify-content: flex-end; }
-      .table-card td.cell-actions::before { content: none; }
-      .table-card .bunk-cell, .table-card .notes-cell { max-width: 70%; white-space: normal; overflow: visible; text-overflow: unset; }
+      /* Grid table with horizontal scroll instead of stacked cards */
+      .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table-card table { min-width: 720px; }
     }
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; }
@@ -262,6 +252,7 @@
             <th>End KM</th>
             <th>Distance</th>
             <th>To Go KM</th>
+            <th>Diff</th>
             <th>Notes</th>
             <th>Actions</th>
           </tr>
@@ -361,17 +352,6 @@
           </div>
 
           <div class="field">
-            <label>Effective KM &#8212; (Total + Outgoing) &minus; Incoming</label>
-            <div class="calc-chip" style="border-color:#86efac; background:var(--success-light);">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-              <div><div class="cl" style="color:#4ade80;">Effective distance for mileage</div><div class="cv" style="color:var(--success);" id="effectiveKMDisplay">Enter KM values above</div></div>
-            </div>
-          </div>
-
-          <hr class="divider" />
-          <div class="section-lbl">&#128202; Projection</div>
-
-          <div class="field form-full">
             <label>Projected Range (km)</label>
             <input type="number" id="f_projected" placeholder="Auto-suggested from avg mileage" min="0" step="1" />
             <span class="helper">Auto-filled = Petrol &#215; overall avg mileage. You can override.</span>
@@ -455,6 +435,11 @@
             <label>To Go KM</label>
             <input type="number" id="trip_toGoKM" placeholder="e.g. 300" min="0" />
             <span class="helper">Auto-filled from the last trip minus this trip's distance — editable</span>
+          </div>
+
+          <div class="field">
+            <label>Diff</label>
+            <input type="number" id="trip_diff" placeholder="e.g. 5" />
           </div>
 
           <div class="field">
