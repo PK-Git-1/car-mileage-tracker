@@ -250,7 +250,10 @@ function render() {
     const nv = sortAsc ? Infinity : -Infinity;
     va = va ?? nv;
     vb = vb ?? nv;
-    return va < vb ? (sortAsc ? -1 : 1) : va > vb ? (sortAsc ? 1 : -1) : 0;
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    // Tiebreaker: sort by startKM descending (higher KM = more recent fill)
+    return (b.startKM ?? 0) - (a.startKM ?? 0);
   });
 
   document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
@@ -434,7 +437,7 @@ function renderFuelTrips(fuelId) {
   container.innerHTML = `
     <table class="fuel-trips-table">
       <thead>
-        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Notes</th></tr>
+        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Notes</th></tr>
       </thead>
       <tbody>
         ${sorted.map(t => {
@@ -443,6 +446,7 @@ function renderFuelTrips(fuelId) {
           const endKM = parseFloat(t.EndKM || t.endKM) || 0;
           const distance = parseFloat(t.Distance || t.distance) || 0;
           const toGoKM = t.ToGoKM !== undefined && t.ToGoKM !== null && t.ToGoKM !== '' ? parseFloat(t.ToGoKM) : (t.toGoKM !== undefined && t.toGoKM !== null && t.toGoKM !== '' ? parseFloat(t.toGoKM) : null);
+          const diff = t.Diff !== undefined && t.Diff !== null && t.Diff !== '' ? parseFloat(t.Diff) : (t.diff !== undefined && t.diff !== null && t.diff !== '' ? parseFloat(t.diff) : null);
           const notes = t.Notes || t.notes || '';
           return `<tr>
             <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
@@ -450,6 +454,7 @@ function renderFuelTrips(fuelId) {
             <td>${endKM.toLocaleString()}</td>
             <td>${distance} km</td>
             <td>${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+            <td>${diff !== null ? diffBadge(diff) : '—'}</td>
             <td>${notes || '—'}</td>
           </tr>`;
         }).join('')}
