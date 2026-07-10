@@ -14,49 +14,82 @@ let deleteId = null;
 function getUsername() { return currentUsername; }
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 
+// ============ AUTH TOKEN STORAGE ============
+// Persisted in localStorage (not sessionStorage) so the "Add to Home Screen"
+// PWA-style usage described in the README stays logged in across restarts.
+// The server enforces the real expiry (see worker/index.js SESSION_TTL_MS).
+function getAuthToken() { return localStorage.getItem('authToken'); }
+function setAuthSession(token, username) {
+  localStorage.setItem('authToken', token);
+  localStorage.setItem('authUsername', username);
+}
+function clearAuthSession() {
+  localStorage.removeItem('authToken');
+  localStorage.removeItem('authUsername');
+}
+
 // ============ API CALLS TO GOOGLE APPS SCRIPT ============
 
 async function callAppsScript(action, payload = {}) {
   try {
     const url = new URL(APPS_SCRIPT_URL, window.location.origin);
     url.searchParams.append('action', action);
-    
+
+    const token = getAuthToken();
+    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
     let options;
-    
+
     if (action.startsWith('get')) {
-      // GET request - no body, no custom headers to avoid CORS preflight
-      options = { method: 'GET' };
+      options = { method: 'GET', headers: authHeaders };
       if (payload.id) url.searchParams.append('id', payload.id);
     } else {
-      // POST request - use text/plain to avoid CORS preflight
-      // (application/json triggers preflight which Apps Script can't handle)
       options = {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8', ...authHeaders },
         body: JSON.stringify(payload)
       };
     }
-    
+
     console.log(`🔗 Calling API: ${action} | URL: ${url.toString()}`);
     const response = await fetch(url.toString(), options);
-    
+
     console.log(`📨 Response Status: ${response.status} ${response.statusText}`);
     console.log(`📨 Response Headers:`, response.headers);
-    
+
+    if (response.status === 401) {
+      clearAuthSession();
+      showLoginScreen();
+      showToast('⚠️ Session expired. Please log in again.', 'error');
+      throw new Error('Session expired');
+    }
+
     if (!response.ok) {
       const text = await response.text();
       console.error(`❌ Response Body: ${text}`);
       throw new Error(`API Error ${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
     }
-    
+
     const data = await response.json();
     console.log(`✅ API Response:`, data);
     return data;
   } catch (err) {
     console.error(`❌ API Error (${action}):`, err.message);
-    showToast(`❌ Connection error: ${err.message}`, 'error');
+    if (err.message !== 'Session expired') {
+      showToast(`❌ Connection error: ${err.message}`, 'error');
+    }
     throw err;
   }
+}
+
+// ============ API CALLS TO WORKER AUTH ENDPOINTS ============
+
+async function authRequest(path, payload) {
+  const response = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  return await response.json();
 }
 
 // Load all data from Google Sheets
@@ -954,23 +987,26 @@ function toggleTripsView() {
 }
 
 /* ===================== AUTHENTICATION ===================== */
-const AUTH_USERNAME = 'admin';
-const AUTH_SALT     = 'TN13AK8507';
-const AUTH_HASH     = '8d5999c16cb017120735dde1fcb974307c25516404d18a9abd5afb2cf6b2d595'; // Titan1987 + salt
 
-async function hashPassword(password) {
-  const data = new TextEncoder().encode(password + AUTH_SALT);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+function showAuthPanel(which) {
+  const isRegister = which === 'register';
+  document.getElementById('loginPanel').classList.toggle('hidden', isRegister);
+  document.getElementById('registerPanel').classList.toggle('hidden', !isRegister);
+  document.getElementById('authTitle').textContent = isRegister ? 'Create Account' : 'Car Mileage Tracker';
+  document.getElementById('authSubtitle').textContent = isRegister
+    ? 'Register to start tracking your own fuel and mileage data.'
+    : 'Track your fuel consumption and mileage. Sign in to access your data.';
+}
+
+function showLoginScreen() {
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('tripContent').style.display = 'none';
+  showAuthPanel('login');
 }
 
 async function showApp(username) {
   currentUsername = username;
-  // Save session credentials with expiration
-  const today = new Date().toISOString().slice(0, 10);
-  sessionStorage.setItem('loginUsername', username);
-  sessionStorage.setItem('loginDate', today);
-  // Password is not stored for security, but hash can be stored if needed
   document.getElementById('loginScreen').classList.add('hidden');
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('tripContent').style.display = 'none';
@@ -989,47 +1025,80 @@ async function submitLogin() {
     return;
   }
 
-  const hash = await hashPassword(password);
-  if (username === AUTH_USERNAME && hash === AUTH_HASH) {
-    // Save password hash for session
-    sessionStorage.setItem('loginPasswordHash', hash);
-    showApp(username);
+  const result = await authRequest('/api/auth/login', { username, password });
+  if (result.success) {
+    setAuthSession(result.token, result.username);
+    document.getElementById('loginUsername').value = '';
+    document.getElementById('loginPassword').value = '';
+    showApp(result.username);
   } else {
-    showToast('❌ Invalid credentials', 'error');
+    showToast(`❌ ${result.error || 'Invalid credentials'}`, 'error');
+  }
+}
+
+async function submitRegister() {
+  const username = document.getElementById('registerUsername').value.trim();
+  const password = document.getElementById('registerPassword').value;
+  const confirmPassword = document.getElementById('registerConfirmPassword').value;
+
+  if (!username || !password || !confirmPassword) {
+    showToast('❌ Please fill in all fields', 'error');
+    return;
+  }
+  if (password !== confirmPassword) {
+    showToast('❌ Passwords do not match', 'error');
+    return;
+  }
+
+  const result = await authRequest('/api/auth/register', { username, password });
+  if (result.success) {
+    setAuthSession(result.token, result.username);
+    document.getElementById('registerUsername').value = '';
+    document.getElementById('registerPassword').value = '';
+    document.getElementById('registerConfirmPassword').value = '';
+    showApp(result.username);
+  } else {
+    showToast(`❌ ${result.error || 'Registration failed'}`, 'error');
   }
 }
 
 function logout() {
   if (confirm('Logout?')) {
-    document.getElementById('loginScreen').classList.remove('hidden');
-    document.getElementById('mainContent').style.display = 'none';
-    document.getElementById('tripContent').style.display = 'none';
+    const token = getAuthToken();
+    if (token) {
+      fetch('/api/auth/logout', { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }).catch(() => {});
+    }
+    clearAuthSession();
     document.getElementById('loginUsername').value = '';
     document.getElementById('loginPassword').value = '';
     currentUsername = '';
     currentView = 'home';
-    sessionStorage.removeItem('loginUsername');
-    sessionStorage.removeItem('loginPasswordHash');
-    sessionStorage.removeItem('loginDate');
+    showLoginScreen();
   }
 }
 
 /* ===================== INIT ===================== */
-document.addEventListener('DOMContentLoaded', () => {
-  // Auto-login if session is valid and not expired
-  const sessionUsername = sessionStorage.getItem('loginUsername');
-  const sessionHash = sessionStorage.getItem('loginPasswordHash');
-  const sessionDate = sessionStorage.getItem('loginDate');
-  const today = new Date().toISOString().slice(0, 10);
-  if (sessionUsername && sessionHash && sessionDate === today) {
-    // Validate hash matches static credentials
-    if (sessionUsername === AUTH_USERNAME && sessionHash === AUTH_HASH) {
-      showApp(sessionUsername);
-      return;
+document.addEventListener('DOMContentLoaded', async () => {
+  // Auto-login if a stored session token is still valid server-side
+  const token = getAuthToken();
+  let autoLoggedIn = false;
+  if (token) {
+    try {
+      const response = await fetch('/api/auth/me', { headers: { 'Authorization': `Bearer ${token}` } });
+      const result = await response.json();
+      if (result.success) {
+        showApp(result.username);
+        autoLoggedIn = true;
+      } else {
+        clearAuthSession();
+      }
+    } catch {
+      // Network error on startup check: fall through to the login screen.
     }
   }
-  // Otherwise, show login screen
-  document.getElementById('loginScreen').classList.remove('hidden');
+  if (!autoLoggedIn) {
+    showLoginScreen();
+  }
 
   const form = document.getElementById('entryForm');
   if (form) {

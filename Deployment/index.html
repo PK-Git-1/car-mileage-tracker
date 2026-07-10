@@ -479,24 +479,54 @@
         <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
       </svg>
     </div>
-    <div class="login-title">Car Mileage Tracker</div>
-    <div class="login-subtitle">Track your fuel consumption and mileage. Sign in to access your data.</div>
-    
-    <div class="login-field">
-      <label>Username</label>
-      <input type="text" id="loginUsername" placeholder="Enter your username" onkeypress="if(event.key === 'Enter') submitLogin()" />
+    <div class="login-title" id="authTitle">Car Mileage Tracker</div>
+    <div class="login-subtitle" id="authSubtitle">Track your fuel consumption and mileage. Sign in to access your data.</div>
+
+    <div id="loginPanel">
+      <div class="login-field">
+        <label>Username</label>
+        <input type="text" id="loginUsername" placeholder="Enter your username" onkeypress="if(event.key === 'Enter') submitLogin()" />
+      </div>
+
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="loginPassword" placeholder="Enter your password" onkeypress="if(event.key === 'Enter') submitLogin()" />
+      </div>
+
+      <div class="login-actions">
+        <button class="btn btn-primary" onclick="submitLogin()" style="flex: 1;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          Login
+        </button>
+      </div>
+
+      <div class="login-helper">Don't have an account? <a href="#" onclick="showAuthPanel('register'); return false;">Register</a></div>
     </div>
 
-    <div class="login-field">
-      <label>Password</label>
-      <input type="password" id="loginPassword" placeholder="Enter your password" onkeypress="if(event.key === 'Enter') submitLogin()" />
-    </div>
-    
-    <div class="login-actions">
-      <button class="btn btn-primary" onclick="submitLogin()" style="flex: 1;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-        Login
-      </button>
+    <div id="registerPanel" class="hidden">
+      <div class="login-field">
+        <label>Username</label>
+        <input type="text" id="registerUsername" placeholder="Choose a username" onkeypress="if(event.key === 'Enter') submitRegister()" />
+      </div>
+
+      <div class="login-field">
+        <label>Password</label>
+        <input type="password" id="registerPassword" placeholder="At least 8 characters" onkeypress="if(event.key === 'Enter') submitRegister()" />
+      </div>
+
+      <div class="login-field">
+        <label>Confirm Password</label>
+        <input type="password" id="registerConfirmPassword" placeholder="Re-enter your password" onkeypress="if(event.key === 'Enter') submitRegister()" />
+      </div>
+
+      <div class="login-actions">
+        <button class="btn btn-primary" onclick="submitRegister()" style="flex: 1;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          Create Account
+        </button>
+      </div>
+
+      <div class="login-helper">Already have an account? <a href="#" onclick="showAuthPanel('login'); return false;">Login</a></div>
     </div>
   </div>
 </div>
