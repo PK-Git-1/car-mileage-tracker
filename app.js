@@ -5,10 +5,9 @@ if (typeof console !== 'undefined') {
 }
 
 /* ===================== STORAGE & API ===================== */
-// IMPORTANT: Update this URL after deploying Google Apps Script
-// Deploy script from AppsScript.js at: https://script.google.com
-// Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxmJpCuFho22A5EMWAITzEPHwO6rXCakb9MkX-cjVR0-4GFvyo5KCr3jD5qf_Iueqql9Q/exec';
+// Same-origin Cloudflare Worker (worker/index.js), backed by D1. Google Sheets
+// (AppsScript.js) is kept as an async backup only — see worker/index.js.
+const APPS_SCRIPT_URL = '/api/data';
 
 let currentUsername = '';
 let deleteId = null;
