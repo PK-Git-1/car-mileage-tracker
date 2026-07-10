@@ -39,6 +39,7 @@
     .btn { display: inline-flex; align-items: center; gap: 6px; padding: 10px 14px; border-radius: 7px; border: none; cursor: pointer; font-size: 0.84rem; font-weight: 600; transition: background 0.15s, transform 0.1s; min-height: 44px; -webkit-user-select: none; user-select: none; }
     .btn:active { transform: scale(0.97); }
     .btn-primary { background: var(--primary); color: #fff; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
     .btn-primary:hover { background: var(--primary-dark); }
     .btn-icon-edit { background: var(--primary-light); color: var(--primary); min-height: 36px; min-width: 36px; }
     .btn-icon-edit:hover { background: #dbeafe; }
@@ -64,12 +65,14 @@
     tbody tr:hover { background: #f8fafc; }
     td { padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
     .bunk-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.76rem; }
+    .notes-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
     .date-str { font-weight: 600; } .dow { font-size: 0.60rem; color: var(--text-muted); margin-top: 1px; }
     .num { font-variant-numeric: tabular-nums; }
     .badge { display: inline-block; padding: 2px 6px; border-radius: 20px; font-size: 0.63rem; font-weight: 700; }
     .badge-green { background: var(--success-light); color: var(--success); }
     .badge-blue  { background: var(--primary-light);  color: var(--primary); }
     .badge-amber { background: #fffbeb;               color: var(--warning); }
+    .badge-orange { background: #fff7ed;               color: #ea580c; }
     .badge-red   { background: var(--danger-light);   color: var(--danger); }
     .actions { display: flex; gap: 6px; }
     .overlay { display: none; position: fixed; inset: 0; background: rgba(15,23,42,0.55); backdrop-filter: blur(3px); z-index: 200; align-items: center; justify-content: center; padding: 16px; padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
@@ -82,9 +85,29 @@
     .modal-close { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border: none; background: var(--bg); border-radius: 7px; cursor: pointer; font-size: 1rem; color: var(--text-muted); min-height: 44px; min-width: 44px; }
     .modal-close:hover { background: var(--border); color: var(--text); }
     .modal-body { padding: 16px 18px; }
+    .modal-tabs { display: flex; gap: 4px; padding: 0 18px; border-bottom: 1px solid var(--border); position: sticky; top: 60px; background: var(--card); z-index: 1; }
+    .modal-tab { padding: 10px 14px; font-size: 0.78rem; font-weight: 600; color: var(--text-muted); border: none; background: none; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; }
+    .modal-tab:hover { color: var(--text); }
+    .modal-tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+    .modal-tab:disabled { color: var(--text-light); cursor: not-allowed; }
+    .tab-pane { display: none; }
+    .tab-pane.active { display: block; }
+    .fuel-trips-table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+    .fuel-trips-table th, .fuel-trips-table td { padding: 8px 6px; border-bottom: 1px solid var(--border); text-align: left; }
+    .fuel-trips-table th { font-size: 0.65rem; text-transform: uppercase; color: var(--text-muted); }
     .modal-footer { padding: 12px 18px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; padding-bottom: max(12px, calc(12px + env(safe-area-inset-bottom))); }
     .form-grid { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    @media (min-width: 769px) {
+      .form-grid { grid-template-columns: 1fr 1fr; }
+      .modal { max-width: 640px; }
+      .modal-wide { max-width: min(1040px, 92vw); }
+      .modal-wide .form-grid { grid-template-columns: repeat(3, 1fr); }
+    }
     .form-full { grid-column: 1 / -1; }
+    .field-2x { grid-column: 1 / -1; }
+    @media (min-width: 769px) {
+      .field-2x { grid-column: span 2; }
+    }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
     .field input, .field select { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; -webkit-border-radius: 7px; }
@@ -126,17 +149,20 @@
     .login-actions button { flex: 1; }
     .login-skip { background: var(--bg); color: var(--text-muted); border: 1.5px solid var(--border); }
     .login-skip:hover { background: var(--border); }
-    @media (max-width: 768px) { 
-      .form-grid { grid-template-columns: 1fr; } 
-      .summary-grid { grid-template-columns: repeat(2, 1fr); } 
+    @media (max-width: 768px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .summary-grid { grid-template-columns: repeat(2, 1fr); }
       main { padding: 0 12px 80px; }
       .file-name { max-width: 120px; }
       .header-meta { display: none; }
+
+      /* Grid table with horizontal scroll instead of stacked cards */
+      .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .table-card table { min-width: 720px; }
     }
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; }
       table { font-size: 0.7rem; }
-      .bunk-cell { max-width: 100px; }
       .modal { max-height: 95vh; }
       .file-actions { flex-direction: column; align-items: flex-start; }
     }
@@ -153,11 +179,11 @@
     <span class="header-meta">Fuel Log</span>
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
-    <button class="btn btn-primary" onclick="openAdd()" id="addEntryBtn">
+    <button class="btn btn-primary" onclick="handleAddClick()" id="addEntryBtn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
       Add Entry
     </button>
-    <button class="btn btn-primary" onclick="switchToTrips()">
+    <button class="btn btn-primary" id="tripsToggleBtn" onclick="toggleTripsView()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
       Trip Data
     </button>
@@ -212,16 +238,8 @@
 <main id="tripContent" style="display: none;">
   <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
     <div style="display: flex; align-items: center; gap: 10px;">
-      <button class="btn btn-cancel" onclick="switchToHome()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>
-        Back
-      </button>
       <h1 style="margin: 0; font-size: 1.3rem;">Trip History</h1>
     </div>
-    <button class="btn btn-primary" onclick="openAddTrip()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-      New Trip
-    </button>
   </div>
 
   <div class="table-card">
@@ -234,6 +252,7 @@
             <th>End KM</th>
             <th>Distance</th>
             <th>To Go KM</th>
+            <th>Diff</th>
             <th>Notes</th>
             <th>Actions</th>
           </tr>
@@ -246,7 +265,7 @@
 
 <!-- ADD / EDIT MODAL -->
 <div class="overlay" id="formOverlay">
-  <div class="modal">
+  <div class="modal modal-wide">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle">Add Fuel Entry</div>
       <div class="modal-header-actions">
@@ -258,17 +277,22 @@
         <button class="modal-close" onclick="closeModal()">&#x2715;</button>
       </div>
     </div>
+    <div class="modal-tabs">
+      <button type="button" class="modal-tab active" id="tabBtnFuelDetails" onclick="switchModalTab('details')">Fuel Details</button>
+      <button type="button" class="modal-tab" id="tabBtnFuelTrips" onclick="switchModalTab('trips')">Trips</button>
+    </div>
     <div class="modal-body">
+      <div class="tab-pane active" id="tabPaneDetails">
       <form id="entryForm" onsubmit="saveEntry(event)">
         <div class="form-grid">
 
-          <div class="field form-full">
+          <div class="field field-2x">
             <label>Petrol Bunk / Station</label>
             <input type="text" id="f_bunk" placeholder="e.g. Reliance-Home" list="bunkList" required />
             <datalist id="bunkList"></datalist>
           </div>
 
-          <div class="field form-full">
+          <div class="field">
             <label>Date</label>
             <input type="date" id="f_date" required />
           </div>
@@ -285,7 +309,7 @@
             <input type="number" id="f_rate" placeholder="e.g. 98.82" min="0" step="0.01" required oninput="calcAll()" />
           </div>
 
-          <div class="field form-full">
+          <div class="field">
             <label>Petrol Qty &#8212; Auto Calculated (Amount &#247; Rate)</label>
             <div class="calc-chip">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
@@ -307,7 +331,7 @@
             <span class="helper">Leave blank if trip not finished</span>
           </div>
 
-          <div class="field form-full">
+          <div class="field">
             <label>Total KM &#8212; Auto Calculated (To &#8722; From)</label>
             <div class="calc-chip">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
@@ -327,18 +351,7 @@
             <span class="helper">KM the car showed when arriving at the <strong>next</strong> fuel stop.</span>
           </div>
 
-          <div class="field form-full">
-            <label>Effective KM &#8212; (Total + Outgoing) &minus; Incoming</label>
-            <div class="calc-chip" style="border-color:#86efac; background:var(--success-light);">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
-              <div><div class="cl" style="color:#4ade80;">Effective distance for mileage</div><div class="cv" style="color:var(--success);" id="effectiveKMDisplay">Enter KM values above</div></div>
-            </div>
-          </div>
-
-          <hr class="divider" />
-          <div class="section-lbl">&#128202; Projection</div>
-
-          <div class="field form-full">
+          <div class="field">
             <label>Projected Range (km)</label>
             <input type="number" id="f_projected" placeholder="Auto-suggested from avg mileage" min="0" step="1" />
             <span class="helper">Auto-filled = Petrol &#215; overall avg mileage. You can override.</span>
@@ -346,6 +359,11 @@
 
         </div>
       </form>
+      </div>
+
+      <div class="tab-pane" id="tabPaneTrips">
+        <div id="fuelTripsContent"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -384,6 +402,12 @@
         <div class="form-grid">
 
           <div class="field form-full">
+            <label>Fuel ID (Reference)</label>
+            <input type="text" id="trip_fuelId" placeholder="Auto-filled" readonly />
+            <span class="helper">Auto-populated from the latest fuel entry</span>
+          </div>
+
+          <div class="field form-full">
             <label>Date</label>
             <input type="date" id="trip_date" required />
           </div>
@@ -410,6 +434,12 @@
           <div class="field">
             <label>To Go KM</label>
             <input type="number" id="trip_toGoKM" placeholder="e.g. 300" min="0" />
+            <span class="helper">Auto-filled from the last trip minus this trip's distance — editable</span>
+          </div>
+
+          <div class="field">
+            <label>Diff</label>
+            <input type="number" id="trip_diff" placeholder="e.g. 5" />
           </div>
 
           <div class="field">

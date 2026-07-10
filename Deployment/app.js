@@ -1,10 +1,13 @@
 'use strict';
+// Disable non-error console output in the UI build (keep errors visible)
+if (typeof console !== 'undefined') {
+  console.log = console.info = console.debug = console.warn = () => {};
+}
 
 /* ===================== STORAGE & API ===================== */
-// IMPORTANT: Update this URL after deploying Google Apps Script
-// Deploy script from AppsScript.js at: https://script.google.com
-// Then paste the deployment URL here
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsZHT8hGVaM8xOZLxmlLBR73ZwkNTC1HrwfPfkWloP8dvymJp1RJ46Kd2eEND_IS5Iyg/exec';
+// Same-origin Cloudflare Worker (worker/index.js), backed by D1. Google Sheets
+// (AppsScript.js) is kept as an async backup only — see worker/index.js.
+const APPS_SCRIPT_URL = '/api/data';
 
 let currentUsername = '';
 let deleteId = null;
@@ -246,7 +249,10 @@ function render() {
     const nv = sortAsc ? Infinity : -Infinity;
     va = va ?? nv;
     vb = vb ?? nv;
-    return va < vb ? (sortAsc ? -1 : 1) : va > vb ? (sortAsc ? 1 : -1) : 0;
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    // Tiebreaker: sort by startKM descending (higher KM = more recent fill)
+    return (b.startKM ?? 0) - (a.startKM ?? 0);
   });
 
   document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
@@ -270,19 +276,19 @@ function render() {
             : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
 
     return `<tr>
-      <td><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
-      <td>${fmtDate(r.date)}</td>
-      <td class="num">${fmtI(r.startKM)}</td>
-      <td class="num">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
-      <td class="num">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num">${fmtMon(r.fuelAmount)}</td>
-      <td class="num">${fmtN(r.fuelRate, 2)}</td>
-      <td class="num">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
-      <td>${milCell}</td>
-      <td><div class="actions">
+      <td data-label="Petrol Bunk"><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
+      <td data-label="Date">${fmtDate(r.date)}</td>
+      <td class="num" data-label="From KM">${fmtI(r.startKM)}</td>
+      <td class="num" data-label="To KM">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Total KM">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td data-label="Projected (km)"><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
+      <td class="num" data-label="Pre-fill KM">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Post-trip KM">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Amount">${fmtMon(r.fuelAmount)}</td>
+      <td class="num" data-label="Fuel Rate">${fmtN(r.fuelRate, 2)}</td>
+      <td class="num" data-label="Petrol (L)">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
+      <td data-label="Mileage">${milCell}</td>
+      <td class="cell-actions" data-label="Actions"><div class="actions">
         <button class="btn btn-icon-edit btn-sm" onclick="openEdit('${r.id}')">✏️</button>
         <button class="btn btn-icon-del btn-sm" onclick="openDelete('${r.id}')">🗑️</button>
       </div></td>
@@ -344,24 +350,13 @@ function calcAll() {
 function calcTotalKM() {
   const sk = parseFloat(document.getElementById('f_startKM').value);
   const ek = parseFloat(document.getElementById('f_endKM').value);
-  const rmv = parseFloat(document.getElementById('f_remainKM').value);
-  const imv = parseFloat(document.getElementById('f_incomingKM').value);
   const tEl = document.getElementById('totalKMDisplay');
-  const eEl = document.getElementById('effectiveKMDisplay');
 
   if (!isNaN(sk) && !isNaN(ek) && ek >= sk) {
     const tkm = ek - sk;
     tEl.textContent = fmtI(tkm) + ' km';
-    const out = isNaN(rmv) ? 0 : rmv;
-    const inc = isNaN(imv) ? 0 : imv;
-    const eff = tkm + out - inc;
-    let expr = fmtI(tkm);
-    if (out > 0) expr += ' + ' + fmtI(out);
-    if (inc > 0) expr += ' − ' + fmtI(inc);
-    eEl.textContent = expr + ' = ' + fmtI(eff) + ' km';
   } else {
     tEl.textContent = 'Enter From and To KM';
-    eEl.textContent = 'Enter KM values above';
   }
 }
 
@@ -379,6 +374,10 @@ function openAdd() {
     document.getElementById('f_startKM').value = latest.endKM;
     calcAll();
   }
+  switchModalTab('details');
+  document.getElementById('tabBtnFuelTrips').disabled = true;
+  document.getElementById('fuelTripsContent').innerHTML =
+    '<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">Save this entry first to add trips.</p>';
   document.getElementById('formOverlay').classList.add('open');
   document.getElementById('f_bunk').focus();
 }
@@ -401,8 +400,65 @@ function openEdit(id) {
   document.getElementById('f_projected').value = r.projected ?? '';
 
   calcAll();
+  switchModalTab('details');
+  document.getElementById('tabBtnFuelTrips').disabled = false;
+  renderFuelTrips(id);
   document.getElementById('formOverlay').classList.add('open');
   document.getElementById('f_bunk').focus();
+}
+
+// Switch between Fuel Details and Trips tabs in the Fuel Entry modal
+function switchModalTab(tab) {
+  document.getElementById('tabPaneDetails').classList.toggle('active', tab === 'details');
+  document.getElementById('tabPaneTrips').classList.toggle('active', tab === 'trips');
+  document.getElementById('tabBtnFuelDetails').classList.toggle('active', tab === 'details');
+  document.getElementById('tabBtnFuelTrips').classList.toggle('active', tab === 'trips');
+  document.getElementById('saveBtn').disabled = tab === 'trips';
+  if (tab === 'trips' && editId) renderFuelTrips(editId);
+}
+
+// Render the trips linked to this fuel entry (matched via Fuel_Id) inside the Trips tab
+function renderFuelTrips(fuelId) {
+  const container = document.getElementById('fuelTripsContent');
+  const linkedTrips = trips.filter(t => String(t.Fuel_Id ?? t.fuel_Id ?? '') === String(fuelId));
+
+  if (linkedTrips.length === 0) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:0.8rem;padding:12px 0;">No trips recorded for this fuel entry.</p>';
+    return;
+  }
+
+  const sorted = linkedTrips.slice().sort((a, b) => {
+    const endA = parseFloat(a.EndKM || a.endKM) || 0;
+    const endB = parseFloat(b.EndKM || b.endKM) || 0;
+    return endB - endA;
+  });
+
+  container.innerHTML = `
+    <table class="fuel-trips-table">
+      <thead>
+        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        ${sorted.map(t => {
+          const tripDate = t.Date || t.date || '';
+          const startKM = parseFloat(t.StartKM || t.startKM) || 0;
+          const endKM = parseFloat(t.EndKM || t.endKM) || 0;
+          const distance = parseFloat(t.Distance || t.distance) || 0;
+          const toGoKM = t.ToGoKM !== undefined && t.ToGoKM !== null && t.ToGoKM !== '' ? parseFloat(t.ToGoKM) : (t.toGoKM !== undefined && t.toGoKM !== null && t.toGoKM !== '' ? parseFloat(t.toGoKM) : null);
+          const diff = t.Diff !== undefined && t.Diff !== null && t.Diff !== '' ? parseFloat(t.Diff) : (t.diff !== undefined && t.diff !== null && t.diff !== '' ? parseFloat(t.diff) : null);
+          const notes = t.Notes || t.notes || '';
+          return `<tr>
+            <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+            <td>${startKM.toLocaleString()}</td>
+            <td>${endKM.toLocaleString()}</td>
+            <td>${distance} km</td>
+            <td>${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+            <td>${diff !== null ? diffBadge(diff) : '—'}</td>
+            <td>${notes || '—'}</td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
 }
 
 function openDelete(id) {
@@ -430,7 +486,6 @@ function resetForm() {
   document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('qtyDisplay').textContent = '—';
   document.getElementById('totalKMDisplay').textContent = '—';
-  document.getElementById('effectiveKMDisplay').textContent = '—';
   document.getElementById('f_endKM')._userEdited = false;
 }
 
@@ -508,6 +563,7 @@ let trips = [];
 let currentView = 'home'; // 'home' or 'trips'
 let tripEditId = null;
 let tripDeleteId = null;
+let lastTripToGoKM = null; // ToGoKM from the most recent trip, used to auto-populate new entries
 
 // API call helper for trips
 async function callTripsAPI(action, payload = {}) {
@@ -580,11 +636,38 @@ async function loadTrips() {
 }
 
 // Open Add Trip modal
-function openAddTrip() {
+async function openAddTrip() {
   tripEditId = null;
   document.getElementById('tripModalTitle').textContent = 'Add Trip';
   document.getElementById('saveTripBtn').textContent = '✓ Save Trip';
   resetTripForm();
+
+  // Auto-populate Start KM and To Go KM from the most recent trip
+  const latestTrip = trips.slice().sort((a, b) => {
+    const endA = parseFloat(a.EndKM || a.endKM) || 0;
+    const endB = parseFloat(b.EndKM || b.endKM) || 0;
+    return endB - endA;
+  }).find(t => (parseFloat(t.EndKM || t.endKM) || 0) > 0);
+  if (latestTrip) {
+    document.getElementById('trip_startKM').value = parseFloat(latestTrip.EndKM || latestTrip.endKM) || '';
+    const prevToGoKM = parseFloat(latestTrip.ToGoKM || latestTrip.toGoKM);
+    lastTripToGoKM = !isNaN(prevToGoKM) ? prevToGoKM : null;
+  } else {
+    lastTripToGoKM = null;
+  }
+  document.getElementById('trip_toGoKM')._userEdited = false;
+  calcTripDistance();
+
+  // Fetch and populate the latest Fuel ID
+  try {
+    const result = await callAppsScript('getLastFuelId');
+    if (result.success && result.lastFuelId) {
+      document.getElementById('trip_fuelId').value = result.lastFuelId;
+    }
+  } catch (err) {
+    console.error('Error fetching last fuel ID:', err.message);
+  }
+
   document.getElementById('tripFormOverlay').classList.add('open');
 }
 
@@ -615,7 +698,10 @@ function openEditTrip(id) {
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
   // For toGoKM: only use empty string if it's actually 0, otherwise show the value
   document.getElementById('trip_toGoKM').value = toGoKM > 0 ? toGoKM : '';
+  document.getElementById('trip_toGoKM')._userEdited = true;
   console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
+  const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? trip.Diff : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? trip.diff : '');
+  document.getElementById('trip_diff').value = diff;
   document.getElementById('trip_notes').value = notes;
 
   document.getElementById('tripFormOverlay').classList.add('open');
@@ -636,6 +722,8 @@ function resetTripForm() {
   document.getElementById('trip_distance').value = '0';
   document.getElementById('trip_fuelId').value = '';
   document.getElementById('trip_toGoKM').value = '';
+  document.getElementById('trip_toGoKM')._userEdited = false;
+  document.getElementById('trip_diff').value = '';
 }
 
 // Calculate distance
@@ -646,6 +734,13 @@ function calcTripDistance() {
 
   document.getElementById('trip_distance').value = distance;
   document.getElementById('tripDistanceDisplay').textContent = distance + ' km';
+
+  // Auto-update To Go KM (previous trip's remaining km minus this trip's distance),
+  // unless the user has manually edited the field
+  const toGoKMEl = document.getElementById('trip_toGoKM');
+  if (!toGoKMEl._userEdited && lastTripToGoKM != null) {
+    toGoKMEl.value = Math.max(0, lastTripToGoKM - distance);
+  }
 }
 
 // Save Trip Entry
@@ -659,9 +754,11 @@ async function saveTripEntry(e) {
   const distance = parseFloat(document.getElementById('trip_distance').value);
   const toGoKMValue = document.getElementById('trip_toGoKM').value.trim();
   const toGoKM = toGoKMValue !== '' ? parseFloat(toGoKMValue) : null;
+  const diffValue = document.getElementById('trip_diff').value.trim();
+  const diff = diffValue !== '' ? parseFloat(diffValue) : null;
   const notes = document.getElementById('trip_notes').value.trim();
 
-  console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, notes });
+  console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, diff, notes });
   console.log('🔍 toGoKM details - Raw value:', document.getElementById('trip_toGoKM').value, '| Trimmed:', toGoKMValue, '| Parsed:', toGoKM);
 
   if (!date || !startKM || !endKM) {
@@ -669,13 +766,31 @@ async function saveTripEntry(e) {
     return;
   }
 
+  // Fall back to the latest Fuel entry's id if Fuel_Id is missing/blank
+  let resolvedFuelId = fuelId;
+  if (!resolvedFuelId) {
+    try {
+      const result = await callAppsScript('getLastFuelId');
+      if (result.success && result.lastFuelId) {
+        resolvedFuelId = result.lastFuelId;
+        console.log('ℹ️ Fuel_Id was empty - using latest Fuel entry id:', resolvedFuelId);
+      }
+    } catch (err) {
+      console.error('Error fetching last fuel ID:', err.message);
+    }
+  }
+
   try {
     if (tripEditId) {
       // Update existing trip - match sheet headers exactly
-      const updates = { Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
+      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
       if (toGoKM !== null) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
+      }
+      if (diff !== null) {
+        updates.Diff = diff;
+        console.log('✏️ Updating Diff:', diff);
       }
       console.log('📤 API Update payload:', updates);
       const result = await callTripsAPI('update', { id: tripEditId, updates });
@@ -690,12 +805,13 @@ async function saveTripEntry(e) {
       // Add new trip - use capital letters to match sheet headers
       const newTrip = {
         id: uid(),
-        Fuel_Id: fuelId,
+        Fuel_Id: resolvedFuelId,
         Date: date,
         StartKM: startKM,
         EndKM: endKM,
         Distance: distance,
         ToGoKM: toGoKM,
+        Diff: diff,
         Notes: notes
       };
       console.log('📤 API Add payload:', newTrip);
@@ -743,12 +859,18 @@ async function confirmTripDelete() {
   }
 }
 
+// Color-coded badge for the Diff column, indicating mileage saved/lost
+function diffBadge(diff) {
+  const badgeClass = diff <= 0 ? 'badge-green' : diff <= 5 ? 'badge-amber' : diff < 10 ? 'badge-orange' : 'badge-red';
+  return `<span class="badge ${badgeClass}">${diff.toLocaleString()}</span>`;
+}
+
 // Render Trips Table (uses cached trips data from memory)
 function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
   if (trips.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
     return;
   }
 
@@ -764,18 +886,20 @@ function renderTrips() {
     const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
     const distance = parseFloat(trip.Distance || trip.distance) || 0;
     const toGoKM = trip.ToGoKM !== undefined && trip.ToGoKM !== null && trip.ToGoKM !== '' ? parseFloat(trip.ToGoKM) : (trip.toGoKM !== undefined && trip.toGoKM !== null && trip.toGoKM !== '' ? parseFloat(trip.toGoKM) : null);
+    const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? parseFloat(trip.Diff) : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? parseFloat(trip.diff) : null);
     const tripDate = trip.Date || trip.date || '';
     const notes = trip.Notes || trip.notes || '';
 
     return `
     <tr>
-      <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
-      <td class="num">${startKM.toLocaleString()}</td>
-      <td class="num">${endKM.toLocaleString()}</td>
-      <td class="num"><strong>${distance}</strong> km</td>
-      <td class="num">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
-      <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis;">${notes || '—'}</td>
-      <td>
+      <td data-label="Date">${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
+      <td class="num" data-label="Start KM">${startKM.toLocaleString()}</td>
+      <td class="num" data-label="End KM">${endKM.toLocaleString()}</td>
+      <td class="num" data-label="Distance"><strong>${distance}</strong> km</td>
+      <td class="num" data-label="To Go KM">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
+      <td class="num" data-label="Diff">${diff !== null ? diffBadge(diff) : '—'}</td>
+      <td class="notes-cell" data-label="Notes">${notes || '—'}</td>
+      <td class="cell-actions" data-label="Actions">
         <div class="actions">
           <button class="btn btn-sm btn-icon-edit" onclick="openEditTrip('${trip.id}')" title="Edit">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -795,14 +919,38 @@ function switchToHome() {
   currentView = 'home';
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('tripContent').style.display = 'none';
+  document.getElementById('tripsToggleBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>Trip Data';
+  document.getElementById('addEntryBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add Entry';
 }
 
 function switchToTrips() {
   currentView = 'trips';
   document.getElementById('mainContent').style.display = 'none';
   document.getElementById('tripContent').style.display = 'block';
+  document.getElementById('tripsToggleBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back';
+  document.getElementById('addEntryBtn').innerHTML =
+    '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>New Trip';
   // Use cached trips data - no need to reload every time
   renderTrips();
+}
+
+function handleAddClick() {
+  if (currentView === 'trips') {
+    openAddTrip();
+  } else {
+    openAdd();
+  }
+}
+
+function toggleTripsView() {
+  if (currentView === 'trips') {
+    switchToHome();
+  } else {
+    switchToTrips();
+  }
 }
 
 /* ===================== AUTHENTICATION ===================== */
@@ -897,6 +1045,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       if (e.target.id === 'f_amount' || e.target.id === 'f_rate' || e.target.id === 'f_startKM' || e.target.id === 'f_endKM') {
         calcAll();
+      }
+    });
+  }
+
+  const tripForm = document.getElementById('tripForm');
+  if (tripForm) {
+    tripForm.addEventListener('input', (e) => {
+      if (e.target.id === 'trip_toGoKM') {
+        e.target._userEdited = true;
       }
     });
   }
