@@ -1052,11 +1052,13 @@ async function submitRegister() {
 
   const result = await authRequest('/api/auth/register', { username, password });
   if (result.success) {
-    setAuthSession(result.token, result.username);
     document.getElementById('registerUsername').value = '';
     document.getElementById('registerPassword').value = '';
     document.getElementById('registerConfirmPassword').value = '';
-    showApp(result.username);
+    showToast('✅ Account created! Please log in.', 'success');
+    showAuthPanel('login');
+    document.getElementById('loginUsername').value = result.username;
+    document.getElementById('loginPassword').focus();
   } else {
     showToast(`❌ ${result.error || 'Registration failed'}`, 'error');
   }

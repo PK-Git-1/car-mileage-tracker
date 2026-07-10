@@ -135,9 +135,7 @@ async function handleRegister(request, env) {
   }
 
   const user = await createUser(env.DB, username, password);
-  await pruneExpiredSessions(env.DB);
-  const token = await createSession(env.DB, user.id);
-  return json({ success: true, token, username: user.username });
+  return json({ success: true, username: user.username });
 }
 
 async function handleLogin(request, env) {
