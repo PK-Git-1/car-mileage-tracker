@@ -605,39 +605,50 @@ async function callTripsAPI(action, payload = {}) {
     url.searchParams.append('action', action);
     url.searchParams.append('sheet', 'Trips'); // Use 'Trips' sheet for trip data
 
+    const token = getAuthToken();
+    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
     let options;
 
     if (action.startsWith('get')) {
       // GET request
-      options = { method: 'GET' };
+      options = { method: 'GET', headers: authHeaders };
       if (payload.id) url.searchParams.append('id', payload.id);
     } else {
       // POST request
       options = {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        headers: { 'Content-Type': 'text/plain;charset=utf-8', ...authHeaders },
         body: JSON.stringify(payload)
       };
     }
 
     console.log(`🔗 Calling Trips API: ${action} | URL: ${url.toString()}`);
     const response = await fetch(url.toString(), options);
-    
+
     console.log(`📨 Response Status: ${response.status} ${response.statusText}`);
     console.log(`📨 Response Headers:`, response.headers);
-    
+
+    if (response.status === 401) {
+      clearAuthSession();
+      showLoginScreen();
+      showToast('⚠️ Session expired. Please log in again.', 'error');
+      throw new Error('Session expired');
+    }
+
     if (!response.ok) {
       const text = await response.text();
       console.error(`❌ Response Body: ${text}`);
       throw new Error(`API Error ${response.status} ${response.statusText}: ${text.substring(0, 100)}`);
     }
-    
+
     const data = await response.json();
     console.log(`✅ Trips API Response:`, data);
     return data;
   } catch (err) {
     console.error(`❌ Trips API Error (${action}):`, err.message);
-    showToast(`❌ Error: ${err.message}`, 'error');
+    if (err.message !== 'Session expired') {
+      showToast(`❌ Error: ${err.message}`, 'error');
+    }
     throw err;
   }
 }
