@@ -18,7 +18,7 @@ function uid() { return Date.now().toString(36) + Math.random().toString(36).sli
 
 async function callAppsScript(action, payload = {}) {
   try {
-    const url = new URL(APPS_SCRIPT_URL);
+    const url = new URL(APPS_SCRIPT_URL, window.location.origin);
     url.searchParams.append('action', action);
     
     let options;
@@ -568,7 +568,7 @@ let lastTripToGoKM = null; // ToGoKM from the most recent trip, used to auto-pop
 // API call helper for trips
 async function callTripsAPI(action, payload = {}) {
   try {
-    const url = new URL(APPS_SCRIPT_URL);
+    const url = new URL(APPS_SCRIPT_URL, window.location.origin);
     url.searchParams.append('action', action);
     url.searchParams.append('sheet', 'Trips'); // Use 'Trips' sheet for trip data
 
