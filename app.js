@@ -393,6 +393,32 @@ function calcTotalKM() {
   }
 }
 
+function calcMileageEdit() {
+  const sk = parseFloat(document.getElementById('f_startKM').value);
+  const ek = parseFloat(document.getElementById('f_endKM').value);
+  const rmv = parseFloat(document.getElementById('f_remainKM').value);
+  const imv = parseFloat(document.getElementById('f_incomingKM').value);
+  const amount = parseFloat(document.getElementById('f_amount').value);
+  const rate = parseFloat(document.getElementById('f_rate').value);
+  const mileageEl = document.getElementById('f_mileage');
+
+  let qty = null;
+  if (amount > 0 && rate > 0) {
+    qty = amount / rate;
+  }
+
+  if (!isNaN(sk) && !isNaN(ek) && ek >= sk && qty != null && qty > 0) {
+    const tkm = ek - sk;
+    const out = isNaN(rmv) ? 0 : rmv;
+    const inc = isNaN(imv) ? 0 : imv;
+    const eff = tkm + out - inc;
+    const mileageVal = eff / qty;
+    mileageEl.value = mileageVal.toFixed(2);
+  } else {
+    mileageEl.value = '0';
+  }
+}
+
 /* ===================== MODAL OPERATIONS ===================== */
 let editId = null;
 
@@ -433,6 +459,7 @@ function openEdit(id) {
   document.getElementById('f_projected').value = r.projected ?? '';
 
   calcAll();
+  calcMileageEdit();
   switchModalTab('details');
   document.getElementById('tabBtnFuelTrips').disabled = false;
   renderFuelTrips(id);
@@ -519,6 +546,7 @@ function resetForm() {
   document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('qtyDisplay').textContent = '—';
   document.getElementById('totalKMDisplay').textContent = '—';
+  document.getElementById('f_mileage').value = '0';
   document.getElementById('f_endKM')._userEdited = false;
 }
 
