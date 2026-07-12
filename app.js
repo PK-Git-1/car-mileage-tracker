@@ -303,9 +303,9 @@ function render() {
     const km = totalKM(r);
     const mil = mileage(r);
     const milCell = mil == null ? '<span style="color:var(--text-light)">—</span>'
-      : mil >= 15 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
-        : mil >= 12.5 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
-          : mil >= 10 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
+      : mil >= 12 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
+        : mil >= 10 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
+          : mil >= 8 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
             : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
 
     return `<tr>
@@ -393,6 +393,18 @@ function calcTotalKM() {
   }
 }
 
+function getMileageColorStyle(mileageVal) {
+  if (mileageVal >= 12) {
+    return { bg: '#f0fdf4', border: '#86efac', text: '#16a34a' };
+  } else if (mileageVal >= 10) {
+    return { bg: '#eff6ff', border: '#bfdbfe', text: '#2563eb' };
+  } else if (mileageVal >= 8) {
+    return { bg: '#fffbeb', border: '#fcd34d', text: '#d97706' };
+  } else {
+    return { bg: '#fef2f2', border: '#fca5a5', text: '#dc2626' };
+  }
+}
+
 function calcMileageEdit() {
   const sk = parseFloat(document.getElementById('f_startKM').value);
   const ek = parseFloat(document.getElementById('f_endKM').value);
@@ -414,8 +426,19 @@ function calcMileageEdit() {
     const eff = tkm + out - inc;
     const mileageVal = eff / qty;
     mileageEl.value = mileageVal.toFixed(2);
+
+    const colorStyle = getMileageColorStyle(mileageVal);
+    mileageEl.style.backgroundColor = colorStyle.bg;
+    mileageEl.style.borderColor = colorStyle.border;
+    mileageEl.style.color = colorStyle.text;
+    mileageEl.style.fontWeight = '600';
   } else {
     mileageEl.value = '0';
+    const colorStyle = getMileageColorStyle(0);
+    mileageEl.style.backgroundColor = colorStyle.bg;
+    mileageEl.style.borderColor = colorStyle.border;
+    mileageEl.style.color = colorStyle.text;
+    mileageEl.style.fontWeight = '600';
   }
 }
 
@@ -546,7 +569,15 @@ function resetForm() {
   document.getElementById('f_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('qtyDisplay').textContent = '—';
   document.getElementById('totalKMDisplay').textContent = '—';
-  document.getElementById('f_mileage').value = '0';
+
+  const mileageEl = document.getElementById('f_mileage');
+  mileageEl.value = '0';
+  const colorStyle = getMileageColorStyle(0);
+  mileageEl.style.backgroundColor = colorStyle.bg;
+  mileageEl.style.borderColor = colorStyle.border;
+  mileageEl.style.color = colorStyle.text;
+  mileageEl.style.fontWeight = '600';
+
   document.getElementById('f_endKM')._userEdited = false;
 }
 
