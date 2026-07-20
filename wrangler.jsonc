@@ -17,8 +17,7 @@
     {
       "binding": "DB",
       "database_name": "punch-fuel-log",
-      "database_id": "620551a5-dc3a-4e31-bee6-bf0abc6a855c",
-      "migrations_dir": "migrations"
+      "database_id": "620551a5-dc3a-4e31-bee6-bf0abc6a855c"
     }
   ],
   "vars": {

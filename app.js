@@ -301,7 +301,7 @@ function render() {
 
   tbody.innerHTML = sorted.map(r => {
     const km = totalKM(r);
-    const mil = mileage(r);
+    const mil = r.mileage ?? null;
     const milCell = mil == null ? '<span style="color:var(--text-light)">—</span>'
       : mil >= 12 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
         : mil >= 10 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
@@ -618,6 +618,8 @@ async function saveFormData() {
 
   if (editId) {
     entry.id = editId;
+    const calcMil = mileage(entry);
+    entry.mileage = calcMil != null ? parseFloat(calcMil.toFixed(2)) : null;
     const updated = await updateEntryAPI(editId, entry);
     if (updated) {
       const idx = data.findIndex(e => e.id === editId);
@@ -627,6 +629,8 @@ async function saveFormData() {
     }
   } else {
     entry.id = uid();
+    const calcMil = mileage(entry);
+    entry.mileage = calcMil != null ? parseFloat(calcMil.toFixed(2)) : null;
     const saved = await addEntryAPI(entry);
     if (saved) {
       data.push(entry);
@@ -893,10 +897,14 @@ async function saveTripEntry(e) {
     }
   }
 
+  const linkedFuelEntry = data.find(e => String(e.id) === String(resolvedFuelId));
+  const rawMil = linkedFuelEntry ? (linkedFuelEntry.mileage != null ? linkedFuelEntry.mileage : mileage(linkedFuelEntry)) : null;
+  const tripMileage = rawMil != null ? parseFloat(rawMil.toFixed(2)) : null;
+
   try {
     if (tripEditId) {
       // Update existing trip - match sheet headers exactly
-      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes };
+      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes, Mileage: tripMileage };
       if (toGoKM !== null) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
@@ -925,7 +933,8 @@ async function saveTripEntry(e) {
         Distance: distance,
         ToGoKM: toGoKM,
         Diff: diff,
-        Notes: notes
+        Notes: notes,
+        Mileage: tripMileage
       };
       console.log('📤 API Add payload:', newTrip);
       const result = await callTripsAPI('add', { entry: newTrip });
@@ -972,6 +981,12 @@ async function confirmTripDelete() {
   }
 }
 
+function mileageBadge(val) {
+  if (val == null) return '—';
+  const cls = val >= 12 ? 'badge-green' : val >= 10 ? 'badge-blue' : val >= 8 ? 'badge-amber' : 'badge-red';
+  return `<span class="badge ${cls}">${fmtN(val, 2)}</span>`;
+}
+
 // Color-coded badge for the Diff column, indicating mileage saved/lost
 function diffBadge(diff) {
   const badgeClass = diff <= 0 ? 'badge-green' : diff <= 5 ? 'badge-amber' : diff < 10 ? 'badge-orange' : 'badge-red';
@@ -983,7 +998,7 @@ function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
   if (trips.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
     return;
   }
 
@@ -1002,6 +1017,7 @@ function renderTrips() {
     const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? parseFloat(trip.Diff) : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? parseFloat(trip.diff) : null);
     const tripDate = trip.Date || trip.date || '';
     const notes = trip.Notes || trip.notes || '';
+    const tripMil = trip.Mileage ?? null;
 
     return `
     <tr>
@@ -1011,6 +1027,7 @@ function renderTrips() {
       <td class="num" data-label="Distance"><strong>${distance}</strong> km</td>
       <td class="num" data-label="To Go KM">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
       <td class="num" data-label="Diff">${diff !== null ? diffBadge(diff) : '—'}</td>
+      <td class="num" data-label="Mileage">${mileageBadge(tripMil)}</td>
       <td class="notes-cell" data-label="Notes">${notes || '—'}</td>
       <td class="cell-actions" data-label="Actions">
         <div class="actions">

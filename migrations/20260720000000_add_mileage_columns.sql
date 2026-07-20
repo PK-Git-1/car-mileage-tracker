@@ -1,0 +1,2 @@
+ALTER TABLE fuel_entries ADD COLUMN mileage REAL;
+ALTER TABLE trips ADD COLUMN Mileage REAL;

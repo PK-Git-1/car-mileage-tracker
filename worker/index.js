@@ -9,8 +9,133 @@
 // All /api/data requests require a Bearer session token (see /api/auth/* below) and
 // are scoped to the authenticated user's own rows via user_id.
 
-const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'user_id'];
-const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'user_id'];
+const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id'];
+const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'user_id'];
+
+// ============ MIGRATIONS ============
+// version = YYYYMMDDHHmmss — add new entries at the bottom, never edit existing ones.
+
+const MIGRATIONS = [
+  {
+    version: '20260101000000',
+    description: 'init_tables',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS fuel_entries (
+         id TEXT PRIMARY KEY, bunk TEXT, date TEXT, startKM REAL, endKM REAL,
+         incomingKM REAL, remainingKM REAL, fuelAmount REAL, fuelRate REAL,
+         fuelQty REAL, projected REAL
+       )`,
+      `CREATE TABLE IF NOT EXISTS trips (
+         id TEXT PRIMARY KEY, Fuel_Id TEXT, Date TEXT, StartKM REAL, EndKM REAL,
+         Distance REAL, ToGoKM REAL, Diff REAL, Notes TEXT
+       )`,
+    ],
+  },
+  {
+    version: '20260101000001',
+    description: 'users_and_ownership',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS users (
+         id TEXT PRIMARY KEY, username TEXT UNIQUE NOT NULL,
+         password_hash TEXT NOT NULL, password_salt TEXT NOT NULL, created_at TEXT NOT NULL
+       )`,
+      `CREATE TABLE IF NOT EXISTS sessions (
+         token TEXT PRIMARY KEY, user_id TEXT NOT NULL,
+         created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+       )`,
+      `ALTER TABLE fuel_entries ADD COLUMN user_id TEXT`,
+      `ALTER TABLE trips ADD COLUMN user_id TEXT`,
+      `INSERT OR IGNORE INTO users (id, username, password_hash, password_salt, created_at)
+       VALUES ('legacy-admin','admin',
+         'd770c9bf0064acea5a87bbe6acb37021f644b4274e47e0d118f3f1021ce2178c',
+         '6be3c95d87a92381d6d11e2cab095aa7','2026-07-10T00:00:00.000Z')`,
+      `UPDATE fuel_entries SET user_id = 'legacy-admin' WHERE user_id IS NULL`,
+      `UPDATE trips       SET user_id = 'legacy-admin' WHERE user_id IS NULL`,
+    ],
+  },
+  {
+    version: '20260720000000',
+    description: 'add_mileage_columns',
+    statements: [
+      `ALTER TABLE fuel_entries ADD COLUMN mileage REAL`,
+      `ALTER TABLE trips        ADD COLUMN Mileage REAL`,
+    ],
+  },
+  {
+    version: '20260720000001',
+    description: 'backfill_mileage',
+    statements: [
+      // Fuel entries: effectiveKM = (endKM - startKM) + remainingKM - incomingKM
+      `UPDATE fuel_entries
+       SET mileage = ROUND(
+         ((endKM - startKM) + COALESCE(remainingKM, 0) - COALESCE(incomingKM, 0)) / fuelQty, 2
+       )
+       WHERE fuelQty IS NOT NULL AND fuelQty > 0
+         AND endKM IS NOT NULL AND startKM IS NOT NULL
+         AND mileage IS NULL`,
+      // Trips: snapshot the mileage from the linked fuel entry
+      `UPDATE trips
+       SET Mileage = (
+         SELECT ROUND(
+           ((fe.endKM - fe.startKM) + COALESCE(fe.remainingKM, 0) - COALESCE(fe.incomingKM, 0)) / fe.fuelQty, 2
+         )
+         FROM fuel_entries fe
+         WHERE fe.id = trips.Fuel_Id
+           AND fe.fuelQty IS NOT NULL AND fe.fuelQty > 0
+           AND fe.endKM IS NOT NULL AND fe.startKM IS NOT NULL
+       )
+       WHERE trips.Fuel_Id IS NOT NULL AND trips.Mileage IS NULL`,
+    ],
+  },
+];
+
+async function runMigrations(db) {
+  await db.prepare(`
+    CREATE TABLE IF NOT EXISTS schema_migrations (
+      version     TEXT PRIMARY KEY,
+      description TEXT,
+      applied_at  TEXT NOT NULL
+    )
+  `).run();
+
+  const { results } = await db.prepare('SELECT version FROM schema_migrations').all();
+  const applied = new Set(results.map(r => r.version));
+  const pending = MIGRATIONS.filter(m => !applied.has(m.version));
+
+  const log = [];
+  for (const migration of pending) {
+    for (const sql of migration.statements) {
+      try {
+        await db.prepare(sql).run();
+      } catch (err) {
+        // Ignore "duplicate column name" — ALTER TABLE ADD COLUMN on an existing column
+        if (err.message && err.message.includes('duplicate column name')) continue;
+        throw new Error(`Migration ${migration.version} failed: ${err.message} | SQL: ${sql.slice(0, 80)}`);
+      }
+    }
+    await db.prepare(
+      'INSERT INTO schema_migrations (version, description, applied_at) VALUES (?1, ?2, ?3)'
+    ).bind(migration.version, migration.description, new Date().toISOString()).run();
+    log.push({ version: migration.version, description: migration.description });
+  }
+
+  return { applied: log, skipped: applied.size };
+}
+
+async function handleMigrate(request, env) {
+  if (request.method !== 'POST') return json({ success: false, error: 'POST required' }, 405);
+  const secret = env.DEPLOY_SECRET;
+  if (secret) {
+    const provided = getBearerToken(request);
+    if (provided !== secret) return json({ success: false, error: 'Unauthorized' }, 401);
+  }
+  try {
+    const result = await runMigrations(env.DB);
+    return json({ success: true, ...result });
+  } catch (err) {
+    return json({ success: false, error: err.message }, 500);
+  }
+}
 
 function tableFor(sheetParam) {
   return sheetParam === 'Trips'
@@ -329,6 +454,10 @@ export default {
     }
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
       return handleMe(request, env);
+    }
+
+    if (url.pathname === '/api/migrate') {
+      return handleMigrate(request, env);
     }
 
     if (url.pathname === '/api/data') {

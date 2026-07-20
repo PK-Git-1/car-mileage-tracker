@@ -3,7 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "build": "node -e \"const fs=require('fs');['index.html','app.js'].forEach(f=>fs.copyFileSync(f,'Deployment/'+f))\" && wrangler deploy",
+    "copy": "node -e \"const fs=require('fs');['index.html','app.js'].forEach(f=>fs.copyFileSync(f,'Deployment/'+f))\"",
+    "build": "npm run copy && wrangler deploy",
+    "deploy": "npm run build && node scripts/post-deploy.mjs",
     "dev": "wrangler dev"
   },
   "devDependencies": {
