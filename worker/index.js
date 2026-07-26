@@ -10,7 +10,7 @@
 // are scoped to the authenticated user's own rows via user_id.
 
 const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id'];
-const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'user_id'];
+const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id'];
 
 // ============ MIGRATIONS ============
 // version = YYYYMMDDHHmmss — add new entries at the bottom, never edit existing ones.
@@ -85,6 +85,13 @@ const MIGRATIONS = [
            AND fe.endKM IS NOT NULL AND fe.startKM IS NOT NULL
        )
        WHERE trips.Fuel_Id IS NOT NULL AND trips.Mileage IS NULL`,
+    ],
+  },
+  {
+    version: '20260726000000',
+    description: 'add_trip_category',
+    statements: [
+      `ALTER TABLE trips ADD COLUMN Category TEXT`,
     ],
   },
 ];
