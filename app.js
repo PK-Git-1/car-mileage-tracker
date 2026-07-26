@@ -617,7 +617,7 @@ function renderFuelTrips(fuelId) {
 
     <table class="fuel-trips-table">
       <thead>
-        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Mileage</th><th>Notes</th></tr>
+        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Mileage</th><th>Category</th><th>Notes</th></tr>
       </thead>
       <tbody>
         ${sorted.map(t => {
@@ -628,6 +628,7 @@ function renderFuelTrips(fuelId) {
           const toGoKM = t.ToGoKM !== undefined && t.ToGoKM !== null && t.ToGoKM !== '' ? parseFloat(t.ToGoKM) : (t.toGoKM !== undefined && t.toGoKM !== null && t.toGoKM !== '' ? parseFloat(t.toGoKM) : null);
           const diff = t.Diff !== undefined && t.Diff !== null && t.Diff !== '' ? parseFloat(t.Diff) : (t.diff !== undefined && t.diff !== null && t.diff !== '' ? parseFloat(t.diff) : null);
           const tripMil = t.Mileage ?? null;
+          const category = t.Category || t.category || '';
           const notes = t.Notes || t.notes || '';
           return `<tr>
             <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
@@ -637,6 +638,7 @@ function renderFuelTrips(fuelId) {
             <td>${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
             <td>${diff !== null ? diffBadge(diff) : '—'}</td>
             <td>${mileageBadge(tripMil)}</td>
+            <td>${getCategoryBadge(category)}</td>
             <td>${notes || '—'}</td>
           </tr>`;
         }).join('')}
@@ -1068,6 +1070,8 @@ function openEditTrip(id) {
   console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
   const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? trip.Diff : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? trip.diff : '');
   document.getElementById('trip_diff').value = diff;
+  const category = trip.Category || trip.category || '';
+  document.getElementById('trip_category').value = category;
   document.getElementById('trip_notes').value = notes;
 
   document.getElementById('tripFormOverlay').classList.add('open');
@@ -1091,6 +1095,7 @@ function resetTripForm() {
   document.getElementById('trip_toGoKM').value = '';
   document.getElementById('trip_toGoKM')._userEdited = false;
   document.getElementById('trip_diff').value = '';
+  document.getElementById('trip_category').value = '';
 }
 
 // Calculate distance
@@ -1123,6 +1128,7 @@ async function saveTripEntry(e) {
   const toGoKM = toGoKMValue !== '' ? parseFloat(toGoKMValue) : null;
   const diffValue = document.getElementById('trip_diff').value.trim();
   const diff = diffValue !== '' ? parseFloat(diffValue) : null;
+  const category = document.getElementById('trip_category').value.trim();
   const notes = document.getElementById('trip_notes').value.trim();
 
   console.log('📝 Trip data to save:', { date, fuelId, startKM, endKM, distance, toGoKM, diff, notes });
@@ -1154,7 +1160,7 @@ async function saveTripEntry(e) {
   try {
     if (tripEditId) {
       // Update existing trip - match sheet headers exactly
-      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes, Mileage: tripMileage };
+      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes, Mileage: tripMileage, Category: category };
       if (toGoKM !== null) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
@@ -1184,7 +1190,8 @@ async function saveTripEntry(e) {
         ToGoKM: toGoKM,
         Diff: diff,
         Notes: notes,
-        Mileage: tripMileage
+        Mileage: tripMileage,
+        Category: category
       };
       console.log('📤 API Add payload:', newTrip);
       const result = await callTripsAPI('add', { entry: newTrip });
@@ -1243,12 +1250,27 @@ function diffBadge(diff) {
   return `<span class="badge ${badgeClass}">${diff.toLocaleString()}</span>`;
 }
 
+function getCategoryBadge(category) {
+  const categoryMap = {
+    'work': { emoji: '🏢', label: 'Work', color: 'badge-blue' },
+    'personal': { emoji: '👤', label: 'Personal', color: 'badge-green' },
+    'highway': { emoji: '🛣️', label: 'Highway', color: 'badge-amber' },
+    'city': { emoji: '🏙️', label: 'City', color: 'badge-orange' },
+    'leisure': { emoji: '🎉', label: 'Leisure', color: 'badge-green' },
+    'emergency': { emoji: '🚨', label: 'Emergency', color: 'badge-red' }
+  };
+
+  if (!category) return '—';
+  const cat = categoryMap[category] || { emoji: '📍', label: category, color: 'badge-blue' };
+  return `<span class="badge ${cat.color}">${cat.emoji} ${cat.label}</span>`;
+}
+
 // Render Trips Table (uses cached trips data from memory)
 function renderTrips() {
   const tbody = document.getElementById('tripTableBody');
 
   if (trips.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px; color: var(--text-muted);">No trips recorded yet. Add one to get started.</td></tr>';
     return;
   }
 
@@ -1266,6 +1288,7 @@ function renderTrips() {
     const toGoKM = trip.ToGoKM !== undefined && trip.ToGoKM !== null && trip.ToGoKM !== '' ? parseFloat(trip.ToGoKM) : (trip.toGoKM !== undefined && trip.toGoKM !== null && trip.toGoKM !== '' ? parseFloat(trip.toGoKM) : null);
     const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? parseFloat(trip.Diff) : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? parseFloat(trip.diff) : null);
     const tripDate = trip.Date || trip.date || '';
+    const category = trip.Category || trip.category || '';
     const notes = trip.Notes || trip.notes || '';
     const tripMil = trip.Mileage ?? null;
 
@@ -1278,6 +1301,7 @@ function renderTrips() {
       <td class="num" data-label="To Go KM">${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
       <td class="num" data-label="Diff">${diff !== null ? diffBadge(diff) : '—'}</td>
       <td class="num" data-label="Mileage">${mileageBadge(tripMil)}</td>
+      <td data-label="Category">${getCategoryBadge(category)}</td>
       <td class="notes-cell" data-label="Notes">${notes || '—'}</td>
       <td class="cell-actions" data-label="Actions">
         <div class="actions">

@@ -64,7 +64,7 @@
     .table-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
     .table-wrapper { overflow-x: auto; }
     table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-    thead tr { background: #f1f5f9; border-bottom: 2px solid var(--border); }
+    thead tr { background: var(--primary-light); border-bottom: 2px solid var(--border); }
     thead th { padding: 10px 8px; text-align: left; font-size: 0.60rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-muted); white-space: nowrap; cursor: pointer; user-select: none; -webkit-user-select: none; }
     thead th:hover { color: var(--primary); }
     thead th:last-child { cursor: default; }
@@ -73,7 +73,7 @@
     thead th.sorted .sort-icon { opacity: 1; color: var(--primary); }
     tbody tr { border-bottom: 1px solid var(--border); transition: background 0.1s; }
     tbody tr:last-child { border-bottom: none; }
-    tbody tr:hover { background: #f8fafc; }
+    tbody tr:hover { background: var(--primary-light); color: var(--text); }
     td { padding: 10px 8px; vertical-align: middle; white-space: nowrap; }
     .bunk-cell { max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 0.76rem; }
     .notes-cell { max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
@@ -313,6 +313,7 @@
             <th>To Go KM</th>
             <th>Diff</th>
             <th>Mileage</th>
+            <th>Category</th>
             <th>Notes</th>
             <th>Actions</th>
           </tr>
@@ -564,6 +565,20 @@
           <div class="field">
             <label>Diff</label>
             <input type="number" id="trip_diff" placeholder="e.g. 5" />
+          </div>
+
+          <div class="field form-full">
+            <label>Trip Category</label>
+            <select id="trip_category" style="padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: var(--card); outline: none;">
+              <option value="">Select category...</option>
+              <option value="work">🏢 Work</option>
+              <option value="personal">👤 Personal</option>
+              <option value="highway">🛣️ Highway</option>
+              <option value="city">🏙️ City</option>
+              <option value="leisure">🎉 Leisure</option>
+              <option value="emergency">🚨 Emergency</option>
+            </select>
+            <span class="helper">Categorize your trips for better tracking and analysis</span>
           </div>
 
           <div class="field">
