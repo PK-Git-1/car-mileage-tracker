@@ -446,8 +446,24 @@ function calcAll() {
     const avg = overallAvgMileage();
     if (avg) endKMEl.value = Math.round(sk + avg * qty);
   }
-  
+
+  calcProjectedKM();
   calcTotalKM();
+}
+
+function calcProjectedKM() {
+  if (editId) return;
+
+  const qty = parseFloat(document.getElementById('f_qty').value);
+  const projectedEl = document.getElementById('f_projected');
+
+  if (!isNaN(qty) && qty > 0) {
+    const avg = overallAvgMileage();
+    if (avg && avg > 0) {
+      const projected = Math.round(qty * avg);
+      projectedEl.value = projected;
+    }
+  }
 }
 
 function calcTotalKM() {

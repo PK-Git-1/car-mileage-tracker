@@ -121,14 +121,14 @@
     }
     .field { display: flex; flex-direction: column; gap: 4px; }
     .field label { font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
-    .field input, .field select { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; -webkit-border-radius: 7px; }
+    .field input, .field select { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: var(--card); outline: none; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; -webkit-border-radius: 7px; }
     .field input:focus, .field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     .field .helper { font-size: 0.62rem; color: var(--text-light); }
     .divider { grid-column: 1/-1; border: none; border-top: 1px dashed var(--border); margin: 2px 0; }
     .section-lbl { grid-column: 1/-1; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
     .section-lbl::after { content: ""; flex: 1; border-top: 1px solid var(--primary-light); }
-    .calc-chip { display: flex; align-items: center; gap: 8px; background: var(--primary-light); border: 1px solid #bfdbfe; border-radius: 7px; padding: 9px 12px; }
-    .calc-chip .cl { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; color: #93c5fd; }
+    .calc-chip { display: flex; align-items: center; gap: 8px; background: var(--primary-light); border: 1px solid var(--primary); border-radius: 7px; padding: 9px 12px; }
+    .calc-chip .cl { font-size: 0.63rem; font-weight: 700; text-transform: uppercase; color: var(--primary); }
     .calc-chip .cv { font-size: 0.9rem; font-weight: 700; color: var(--primary); }
     .confirm-modal { background: var(--card); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,0.25); width: 100%; max-width: 360px; padding: 28px 28px 22px; text-align: center; animation: slideUp 0.2s ease; }
     .confirm-icon { width: 52px; height: 52px; background: var(--danger-light); border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 14px; }
@@ -161,7 +161,7 @@
     .login-subtitle { font-size: 0.9rem; color: var(--text-muted); margin-bottom: 28px; line-height: 1.5; }
     .login-field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 16px; text-align: left; }
     .login-field label { font-size: 0.73rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.3px; color: var(--text-muted); }
-    .login-field input { padding: 11px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 16px; color: var(--text); background: #fff; outline: none; transition: border-color 0.15s; }
+    .login-field input { padding: 11px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 16px; color: var(--text); background: var(--card); outline: none; transition: border-color 0.15s; }
     .login-field input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     .login-helper { font-size: 0.7rem; color: var(--text-light); margin-top: 6px; }
     .login-helper a { color: var(--primary); text-decoration: none; }
@@ -249,14 +249,14 @@
 
   <!-- SEARCH & FILTER SECTION -->
   <div style="background: var(--card); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-    <input type="text" id="searchInput" placeholder="🔍 Search by bunk..." style="flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+    <input type="text" id="searchInput" placeholder="🔍 Search by bunk..." style="flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
 
     <div style="display: flex; gap: 8px;">
       <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
-        From: <input type="date" id="filterDateFrom" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+        From: <input type="date" id="filterDateFrom" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
       </label>
       <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
-        To: <input type="date" id="filterDateTo" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+        To: <input type="date" id="filterDateTo" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
       </label>
     </div>
 
@@ -436,8 +436,8 @@
           <div class="field">
             <label>Petrol Qty &#8212; Auto Calculated (Amount &#247; Rate)</label>
             <div class="calc-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
-              <div><div class="cl">Litres</div><div class="cv" id="qtyDisplay">Enter amount and rate</div></div>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2a10 10 0 1 0 10 10"/><path d="M12 6v6l4 2"/></svg>
+              <div class="cv" id="qtyDisplay">Enter amount and rate</div>
             </div>
             <input type="hidden" id="f_qty" />
           </div>
@@ -458,8 +458,8 @@
           <div class="field">
             <label>Total KM &#8212; Auto Calculated (To &#8722; From)</label>
             <div class="calc-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              <div><div class="cl">Distance</div><div class="cv" id="totalKMDisplay">Enter From and To KM</div></div>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              <div class="cv" id="totalKMDisplay">Enter From and To KM</div>
             </div>
           </div>
 
@@ -547,13 +547,28 @@
             <input type="number" id="trip_endKM" placeholder="e.g. 5150" min="0" required oninput="calcTripDistance()" />
           </div>
 
-          <div class="field form-full">
-            <label>Distance (km) &#8212; Auto Calculated (End &#8722; Start)</label>
-            <div class="calc-chip">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#93c5fd" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              <div><div class="cl">Distance</div><div class="cv" id="tripDistanceDisplay">0 km</div></div>
+          <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 12px; grid-column: 1 / -1;">
+            <div class="field">
+              <label>Distance (km) &#8212; Auto Calculated (End &#8722; Start)</label>
+              <div class="calc-chip">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                <div class="cv" id="tripDistanceDisplay">0 km</div>
+              </div>
+              <input type="hidden" id="trip_distance" />
             </div>
-            <input type="hidden" id="trip_distance" />
+
+            <div class="field">
+              <label>Trip Category</label>
+              <select id="trip_category" style="padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: var(--card); outline: none;">
+                <option value="">Select category...</option>
+                <option value="work">🏢 Work</option>
+                <option value="personal">👤 Personal</option>
+                <option value="highway">🛣️ Highway</option>
+                <option value="city">🏙️ City</option>
+                <option value="leisure">🎉 Leisure</option>
+                <option value="emergency">🚨 Emergency</option>
+              </select>
+            </div>
           </div>
 
           <div class="field">
@@ -568,20 +583,6 @@
           </div>
 
           <div class="field form-full">
-            <label>Trip Category</label>
-            <select id="trip_category" style="padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: var(--card); outline: none;">
-              <option value="">Select category...</option>
-              <option value="work">🏢 Work</option>
-              <option value="personal">👤 Personal</option>
-              <option value="highway">🛣️ Highway</option>
-              <option value="city">🏙️ City</option>
-              <option value="leisure">🎉 Leisure</option>
-              <option value="emergency">🚨 Emergency</option>
-            </select>
-            <span class="helper">Categorize your trips for better tracking and analysis</span>
-          </div>
-
-          <div class="field">
             <label>Notes</label>
             <input type="text" id="trip_notes" placeholder="e.g. Office to Home via Airport Road" />
           </div>
