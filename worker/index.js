@@ -450,6 +450,12 @@ export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
 
+    try {
+      await runMigrations(env.DB);
+    } catch (err) {
+      console.error('Auto-migration failed (non-blocking):', err.message);
+    }
+
     if (url.pathname === '/api/auth/register' && request.method === 'POST') {
       return handleRegister(request, env);
     }
