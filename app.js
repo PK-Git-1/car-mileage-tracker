@@ -174,6 +174,40 @@ async function deleteEntryAPI(id) {
 
 /* ===================== DATA MANAGEMENT ===================== */
 let data = [];
+let history = [];
+let historyIndex = -1;
+
+function saveToHistory() {
+  historyIndex++;
+  history = history.slice(0, historyIndex);
+  history.push(JSON.parse(JSON.stringify(data)));
+  if (history.length > 50) {
+    history.shift();
+    historyIndex--;
+  }
+}
+
+function undo() {
+  if (historyIndex > 0) {
+    historyIndex--;
+    data = JSON.parse(JSON.stringify(history[historyIndex]));
+    render();
+    showToast('↶ Undo successful', 'success');
+  } else {
+    showToast('❌ Nothing to undo', 'error');
+  }
+}
+
+function redo() {
+  if (historyIndex < history.length - 1) {
+    historyIndex++;
+    data = JSON.parse(JSON.stringify(history[historyIndex]));
+    render();
+    showToast('↷ Redo successful', 'success');
+  } else {
+    showToast('❌ Nothing to redo', 'error');
+  }
+}
 
 async function initializeData() {
   document.getElementById('tableBody').innerHTML =
@@ -183,15 +217,94 @@ async function initializeData() {
     '</div></td></tr>';
   data = await loadDataFromAPI();
   console.log(`Loaded ${data.length} entries from Google Sheets`);
+  saveToHistory();
   render();
 }
 
-/* ===================== SORT ===================== */
+/* ===================== SORT & FILTER ===================== */
 let sortKey = 'date', sortAsc = false;
+let filteredData = [];
+
 function sortBy(key) {
   if (sortKey === key) sortAsc = !sortAsc;
   else { sortKey = key; sortAsc = false; }
-  render();
+  applyFilters();
+}
+
+function applyFilters() {
+  const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+  const dateFrom = document.getElementById('filterDateFrom').value;
+  const dateTo = document.getElementById('filterDateTo').value;
+
+  filteredData = data.filter(r => {
+    const bunkMatch = (r.bunk || '').toLowerCase().includes(searchTerm);
+    const dateMatch = (!dateFrom || (r.date && r.date >= dateFrom)) && (!dateTo || (r.date && r.date <= dateTo));
+    return bunkMatch && dateMatch;
+  });
+
+  renderTable();
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('filterDateFrom').value = '';
+  document.getElementById('filterDateTo').value = '';
+  filteredData = [...data];
+  renderTable();
+}
+
+function renderTable() {
+  const sorted = [...filteredData].sort((a, b) => {
+    let va, vb;
+    if (sortKey === 'totalKM') { va = totalKM(a); vb = totalKM(b); }
+    else if (sortKey === 'mileage') { va = mileage(a); vb = mileage(b); }
+    else { va = a[sortKey]; vb = b[sortKey]; }
+    const nv = sortAsc ? Infinity : -Infinity;
+    va = va ?? nv;
+    vb = vb ?? nv;
+    if (va < vb) return sortAsc ? -1 : 1;
+    if (va > vb) return sortAsc ? 1 : -1;
+    return (b.startKM ?? 0) - (a.startKM ?? 0);
+  });
+
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  const ath = document.getElementById('th-' + sortKey);
+  if (ath) ath.classList.add('sorted');
+
+  const tbody = document.getElementById('tableBody');
+  if (!sorted.length) {
+    tbody.innerHTML = '<tr><td colspan="13"><div style="text-align:center;padding:40px 20px;"><p style="color:var(--text-muted);margin-bottom:20px;">No entries found.</p></div></td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = sorted.map(r => {
+    const km = totalKM(r);
+    const mil = r.mileage ?? null;
+    const milCell = mil == null ? '<span style="color:var(--text-light)">—</span>'
+      : mil >= 12 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
+        : mil >= 10 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
+          : mil >= 8 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
+            : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
+
+    return `<tr>
+      <td data-label="Petrol Bunk"><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
+      <td data-label="Date">${fmtDate(r.date)}</td>
+      <td class="num" data-label="From KM">${fmtI(r.startKM)}</td>
+      <td class="num" data-label="To KM">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Total KM">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td data-label="Projected (km)"><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
+      <td class="num" data-label="Pre-fill KM">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Post-trip KM">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
+      <td class="num" data-label="Amount">${fmtMon(r.fuelAmount)}</td>
+      <td class="num" data-label="Fuel Rate">${fmtN(r.fuelRate, 2)}</td>
+      <td class="num" data-label="Petrol (L)">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
+      <td data-label="Mileage">${milCell}</td>
+      <td class="cell-actions" data-label="Actions"><div class="actions">
+        <button class="btn btn-icon-edit btn-sm" onclick="openEdit('${r.id}')">✏️</button>
+        <button class="btn btn-icon-del btn-sm" onclick="openDelete('${r.id}')">🗑️</button>
+      </div></td>
+    </tr>`;
+  }).join('');
 }
 
 /* ===================== COMPUTED FIELDS ===================== */
@@ -274,63 +387,20 @@ function fmtDate(d) {
 
 /* ===================== RENDER TABLE ===================== */
 function render() {
-  const sorted = [...data].sort((a, b) => {
-    let va, vb;
-    if (sortKey === 'totalKM') { va = totalKM(a); vb = totalKM(b); }
-    else if (sortKey === 'mileage') { va = mileage(a); vb = mileage(b); }
-    else { va = a[sortKey]; vb = b[sortKey]; }
-    const nv = sortAsc ? Infinity : -Infinity;
-    va = va ?? nv;
-    vb = vb ?? nv;
-    if (va < vb) return sortAsc ? -1 : 1;
-    if (va > vb) return sortAsc ? 1 : -1;
-    // Tiebreaker: sort by startKM descending (higher KM = more recent fill)
-    return (b.startKM ?? 0) - (a.startKM ?? 0);
-  });
-
-  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
-  const ath = document.getElementById('th-' + sortKey);
-  if (ath) ath.classList.add('sorted');
-
-  const tbody = document.getElementById('tableBody');
   if (!data.length) {
-    tbody.innerHTML = '<tr><td colspan="13"><div style="text-align:center;padding:40px 20px;"><p style="color:var(--text-muted);margin-bottom:20px;">No entries yet.</p><button class="btn btn-primary" onclick="openAdd()">➕ Add First Entry</button></div></td></tr>';
+    document.getElementById('tableBody').innerHTML = '<tr><td colspan="13"><div style="text-align:center;padding:40px 20px;"><p style="color:var(--text-muted);margin-bottom:20px;">No entries yet.</p><button class="btn btn-primary" onclick="openAdd()">➕ Add First Entry</button></div></td></tr>';
     updateSummary();
+    checkAndDisplayAlerts();
     return;
   }
 
-  tbody.innerHTML = sorted.map(r => {
-    const km = totalKM(r);
-    const mil = r.mileage ?? null;
-    const milCell = mil == null ? '<span style="color:var(--text-light)">—</span>'
-      : mil >= 12 ? `<span class="badge badge-green">${fmtN(mil, 2)}</span>`
-        : mil >= 10 ? `<span class="badge badge-blue">${fmtN(mil, 2)}</span>`
-          : mil >= 8 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
-            : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
-
-    return `<tr>
-      <td data-label="Petrol Bunk"><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
-      <td data-label="Date">${fmtDate(r.date)}</td>
-      <td class="num" data-label="From KM">${fmtI(r.startKM)}</td>
-      <td class="num" data-label="To KM">${r.endKM != null ? fmtI(r.endKM) : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num" data-label="Total KM">${km != null ? fmtI(km) + ' km' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td data-label="Projected (km)"><span class="badge badge-blue">${fmtI(r.projected)}</span></td>
-      <td class="num" data-label="Pre-fill KM">${r.incomingKM != null ? '<span class="badge badge-blue">↓ ' + fmtI(r.incomingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num" data-label="Post-trip KM">${r.remainingKM != null ? '<span class="badge badge-amber">↑ ' + fmtI(r.remainingKM) + ' km</span>' : '<span style="color:var(--text-light)">—</span>'}</td>
-      <td class="num" data-label="Amount">${fmtMon(r.fuelAmount)}</td>
-      <td class="num" data-label="Fuel Rate">${fmtN(r.fuelRate, 2)}</td>
-      <td class="num" data-label="Petrol (L)">${r.fuelQty != null ? fmtN(r.fuelQty, 2) + ' L' : '—'}</td>
-      <td data-label="Mileage">${milCell}</td>
-      <td class="cell-actions" data-label="Actions"><div class="actions">
-        <button class="btn btn-icon-edit btn-sm" onclick="openEdit('${r.id}')">✏️</button>
-        <button class="btn btn-icon-del btn-sm" onclick="openDelete('${r.id}')">🗑️</button>
-      </div></td>
-    </tr>`;
-  }).join('');
-
+  filteredData = [...data];
+  renderTable();
   document.getElementById('countLabel').textContent = data.length + ' record' + (data.length !== 1 ? 's' : '');
   updateSummary();
   rebuildBunkList();
+  checkAndDisplayAlerts();
+  if (currentView === 'analytics') updateCharts();
 }
 
 function updateSummary() {
@@ -523,10 +593,31 @@ function renderFuelTrips(fuelId) {
     return endB - endA;
   });
 
+  // Calculate trip summary stats
+  const totalTripDistance = sorted.reduce((sum, t) => sum + (parseFloat(t.Distance || t.distance) || 0), 0);
+  const avgTripMileage = sorted.reduce((sum, t) => sum + (t.Mileage ?? 0), 0) / sorted.length || 0;
+  const fuelEntry = data.find(e => String(e.id) === String(fuelId));
+  const costPerTrip = fuelEntry ? (fuelEntry.fuelAmount || 0) / Math.max(1, sorted.length) : 0;
+
   container.innerHTML = `
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 16px;">
+      <div class="stat-card" style="padding: 10px 12px;">
+        <div class="stat-label" style="margin-bottom: 6px;">Total Trip Distance</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">${fmtI(totalTripDistance)} km</div>
+      </div>
+      <div class="stat-card" style="padding: 10px 12px;">
+        <div class="stat-label" style="margin-bottom: 6px;">Avg Mileage</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--success);">${fmtN(avgTripMileage, 2)} km/L</div>
+      </div>
+      <div class="stat-card" style="padding: 10px 12px;">
+        <div class="stat-label" style="margin-bottom: 6px;">Cost per Trip</div>
+        <div style="font-size: 1.1rem; font-weight: 700; color: var(--text);">₹${fmtN(costPerTrip, 2)}</div>
+      </div>
+    </div>
+
     <table class="fuel-trips-table">
       <thead>
-        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Notes</th></tr>
+        <tr><th>Date</th><th>From KM</th><th>To KM</th><th>Distance</th><th>To Go KM</th><th>Diff</th><th>Mileage</th><th>Notes</th></tr>
       </thead>
       <tbody>
         ${sorted.map(t => {
@@ -536,6 +627,7 @@ function renderFuelTrips(fuelId) {
           const distance = parseFloat(t.Distance || t.distance) || 0;
           const toGoKM = t.ToGoKM !== undefined && t.ToGoKM !== null && t.ToGoKM !== '' ? parseFloat(t.ToGoKM) : (t.toGoKM !== undefined && t.toGoKM !== null && t.toGoKM !== '' ? parseFloat(t.toGoKM) : null);
           const diff = t.Diff !== undefined && t.Diff !== null && t.Diff !== '' ? parseFloat(t.Diff) : (t.diff !== undefined && t.diff !== null && t.diff !== '' ? parseFloat(t.diff) : null);
+          const tripMil = t.Mileage ?? null;
           const notes = t.Notes || t.notes || '';
           return `<tr>
             <td>${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
@@ -544,6 +636,7 @@ function renderFuelTrips(fuelId) {
             <td>${distance} km</td>
             <td>${toGoKM !== null ? toGoKM.toLocaleString() + ' km' : '—'}</td>
             <td>${diff !== null ? diffBadge(diff) : '—'}</td>
+            <td>${mileageBadge(tripMil)}</td>
             <td>${notes || '—'}</td>
           </tr>`;
         }).join('')}
@@ -592,6 +685,7 @@ async function deleteEntry(id) {
   const deleted = await deleteEntryAPI(id);
   if (deleted) {
     data = data.filter(e => e.id !== id);
+    saveToHistory();
     render();
   }
 }
@@ -624,6 +718,7 @@ async function saveFormData() {
     if (updated) {
       const idx = data.findIndex(e => e.id === editId);
       if (idx >= 0) data[idx] = entry;
+      saveToHistory();
       render();
       closeForm();
     }
@@ -634,6 +729,7 @@ async function saveFormData() {
     const saved = await addEntryAPI(entry);
     if (saved) {
       data.push(entry);
+      saveToHistory();
       render();
       closeForm();
     }
@@ -663,10 +759,164 @@ function closeModal() {
 /* ===================== TRIP DATA MANAGEMENT ===================== */
 
 let trips = [];
-let currentView = 'home'; // 'home' or 'trips'
+let currentView = 'home'; // 'home', 'trips', or 'analytics'
 let tripEditId = null;
 let tripDeleteId = null;
 let lastTripToGoKM = null; // ToGoKM from the most recent trip, used to auto-populate new entries
+
+/* ===================== VEHICLE MANAGEMENT ===================== */
+let vehicles = [];
+let currentVehicleId = null;
+let vehicleEditId = null;
+
+function initializeVehicles() {
+  const stored = localStorage.getItem('vehicles');
+  vehicles = stored ? JSON.parse(stored) : [];
+  const savedVehicleId = localStorage.getItem('currentVehicleId');
+  currentVehicleId = savedVehicleId || (vehicles.length > 0 ? vehicles[0].id : null);
+  populateVehicleSelector();
+}
+
+function saveVehiclesToStorage() {
+  localStorage.setItem('vehicles', JSON.stringify(vehicles));
+}
+
+function populateVehicleSelector() {
+  const selector = document.getElementById('vehicleSelector');
+  selector.innerHTML = vehicles.map(v => `
+    <option value="${v.id}" ${v.id === currentVehicleId ? 'selected' : ''}>${v.name}</option>
+  `).join('');
+  if (vehicles.length === 0) {
+    selector.innerHTML = '<option value="">No vehicles - Add one first</option>';
+  }
+}
+
+function switchVehicle() {
+  const vehicleId = document.getElementById('vehicleSelector').value;
+  if (vehicleId) {
+    currentVehicleId = vehicleId;
+    localStorage.setItem('currentVehicleId', vehicleId);
+    render();
+  }
+}
+
+function openVehicleManager() {
+  document.getElementById('vehiclesList').innerHTML = `
+    <div style="display: grid; gap: 12px;">
+      ${vehicles.length === 0 ? '<p style="color: var(--text-muted); text-align: center; padding: 20px;">No vehicles yet. Add your first vehicle!</p>' : ''}
+      ${vehicles.map(v => `
+        <div style="background: var(--bg); padding: 12px; border-radius: 8px; border: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <div style="font-weight: 700;">${v.name}</div>
+            <div style="font-size: 0.85rem; color: var(--text-muted);">${v.model || 'No model'} • ${v.plate || 'No plate'}</div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-sm btn-icon-edit" onclick="editVehicle('${v.id}')">✏️</button>
+            <button class="btn btn-sm btn-icon-del" onclick="deleteVehicle('${v.id}')">🗑️</button>
+          </div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('vehicleManagerOverlay').classList.add('open');
+}
+
+function closeVehicleManager() {
+  document.getElementById('vehicleManagerOverlay').classList.remove('open');
+}
+
+function openAddVehicle() {
+  vehicleEditId = null;
+  document.getElementById('vehicleFormTitle').textContent = 'Add Vehicle';
+  document.getElementById('vehicleForm').reset();
+  document.getElementById('vehicleFormOverlay').classList.add('open');
+}
+
+function editVehicle(vehicleId) {
+  const vehicle = vehicles.find(v => v.id === vehicleId);
+  if (!vehicle) return;
+
+  vehicleEditId = vehicleId;
+  document.getElementById('vehicleFormTitle').textContent = 'Edit Vehicle';
+  document.getElementById('vf_name').value = vehicle.name;
+  document.getElementById('vf_model').value = vehicle.model || '';
+  document.getElementById('vf_plate').value = vehicle.plate || '';
+  document.getElementById('vf_baselineMileage').value = vehicle.baselineMileage || '';
+  document.getElementById('vehicleFormOverlay').classList.add('open');
+}
+
+function saveVehicle() {
+  const name = document.getElementById('vf_name').value.trim();
+  const model = document.getElementById('vf_model').value.trim();
+  const plate = document.getElementById('vf_plate').value.trim();
+  const baselineMileage = parseFloat(document.getElementById('vf_baselineMileage').value) || null;
+
+  if (!name) {
+    showToast('❌ Vehicle name required', 'error');
+    return;
+  }
+
+  if (vehicleEditId) {
+    const idx = vehicles.findIndex(v => v.id === vehicleEditId);
+    if (idx >= 0) {
+      vehicles[idx] = { ...vehicles[idx], name, model, plate, baselineMileage };
+      showToast('✓ Vehicle updated', 'success');
+    }
+  } else {
+    vehicles.push({ id: uid(), name, model, plate, baselineMileage, createdAt: new Date().toISOString() });
+    showToast('✓ Vehicle added', 'success');
+  }
+
+  saveVehiclesToStorage();
+  populateVehicleSelector();
+  closeVehicleForm();
+  openVehicleManager();
+}
+
+function deleteVehicle(vehicleId) {
+  if (confirm('Delete this vehicle? All associated fuel entries will remain.')) {
+    vehicles = vehicles.filter(v => v.id !== vehicleId);
+    if (currentVehicleId === vehicleId) {
+      currentVehicleId = vehicles.length > 0 ? vehicles[0].id : null;
+      localStorage.setItem('currentVehicleId', currentVehicleId || '');
+    }
+    saveVehiclesToStorage();
+    populateVehicleSelector();
+    openVehicleManager();
+    showToast('✓ Vehicle deleted', 'success');
+  }
+}
+
+function closeVehicleForm() {
+  document.getElementById('vehicleFormOverlay').classList.remove('open');
+  vehicleEditId = null;
+}
+
+/* ===================== DARK MODE ===================== */
+
+function initializeDarkMode() {
+  const savedMode = localStorage.getItem('darkMode');
+  if (savedMode === 'true' || (!savedMode && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    document.body.classList.add('dark-mode');
+    updateDarkModeButton();
+  }
+}
+
+function toggleDarkMode() {
+  document.body.classList.toggle('dark-mode');
+  const isDarkMode = document.body.classList.contains('dark-mode');
+  localStorage.setItem('darkMode', isDarkMode);
+  updateDarkModeButton();
+}
+
+function updateDarkModeButton() {
+  const btn = document.getElementById('darkModeBtn');
+  if (document.body.classList.contains('dark-mode')) {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>';
+  } else {
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+  }
+}
 
 // API call helper for trips
 async function callTripsAPI(action, payload = {}) {
@@ -1068,7 +1318,9 @@ function switchToTrips() {
 }
 
 function handleAddClick() {
-  if (currentView === 'trips') {
+  if (currentView === 'analytics') {
+    openAdd();
+  } else if (currentView === 'trips') {
     openAddTrip();
   } else {
     openAdd();
@@ -1081,6 +1333,451 @@ function toggleTripsView() {
   } else {
     switchToTrips();
   }
+}
+
+function handleAddClick() {
+  if (currentView === 'analytics') {
+    openAdd();
+  } else if (currentView === 'trips') {
+    openAddTrip();
+  } else {
+    openAdd();
+  }
+}
+
+function toggleAnalyticsView() {
+  if (currentView === 'analytics') {
+    switchToHome();
+  } else {
+    switchToAnalytics();
+  }
+}
+
+function switchToAnalytics() {
+  currentView = 'analytics';
+  document.getElementById('mainContent').style.display = 'none';
+  document.getElementById('tripContent').style.display = 'none';
+  document.getElementById('analyticsContent').style.display = 'block';
+  document.getElementById('analyticsToggleBtn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>Back';
+  document.getElementById('addEntryBtn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add Entry';
+  initializeAnalytics();
+}
+
+function switchToHome() {
+  currentView = 'home';
+  document.getElementById('mainContent').style.display = 'block';
+  document.getElementById('tripContent').style.display = 'none';
+  document.getElementById('analyticsContent').style.display = 'none';
+  document.getElementById('analyticsToggleBtn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18a2 2 0 002 2h16V3"/><path d="M7 12h4M15 8h4M11 16h8M3 8h2M3 12h2M3 16h2"/></svg>Analytics';
+  document.getElementById('tripsToggleBtn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>Trip Data';
+  document.getElementById('addEntryBtn').innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>Add Entry';
+}
+
+/* ===================== ANALYTICS ===================== */
+
+let currentAnalyticsMonth = new Date();
+let analyticsCharts = {};
+
+function initializeAnalytics() {
+  populateMonthSelector();
+  updateAnalytics();
+}
+
+function populateMonthSelector() {
+  const selector = document.getElementById('monthSelector');
+  selector.innerHTML = '';
+
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const value = date.toISOString().slice(0, 7);
+    const label = date.toLocaleDateString('en-IN', { year: 'numeric', month: 'long' });
+
+    const option = document.createElement('option');
+    option.value = value;
+    option.textContent = label;
+    if (i === 0) option.selected = true;
+    selector.appendChild(option);
+  }
+}
+
+function prevMonth() {
+  currentAnalyticsMonth.setMonth(currentAnalyticsMonth.getMonth() - 1);
+  const value = currentAnalyticsMonth.toISOString().slice(0, 7);
+  document.getElementById('monthSelector').value = value;
+  updateAnalytics();
+}
+
+function nextMonth() {
+  currentAnalyticsMonth.setMonth(currentAnalyticsMonth.getMonth() + 1);
+  const value = currentAnalyticsMonth.toISOString().slice(0, 7);
+  document.getElementById('monthSelector').value = value;
+  updateAnalytics();
+}
+
+function updateAnalytics() {
+  const selectedMonth = document.getElementById('monthSelector').value;
+  const [year, month] = selectedMonth.split('-');
+  currentAnalyticsMonth = new Date(year, parseInt(month) - 1);
+
+  const monthData = getMonthlyData(selectedMonth);
+  updateAnalyticsCards(monthData);
+  updateCharts();
+}
+
+function getMonthlyData(monthStr) {
+  const [year, month] = monthStr.split('-');
+  const monthEntries = data.filter(entry => {
+    if (!entry.date) return false;
+    const entryDate = entry.date.split('T')[0];
+    return entryDate.startsWith(monthStr);
+  });
+
+  const totalAmount = monthEntries.reduce((sum, e) => sum + (e.fuelAmount || 0), 0);
+  const totalFuel = monthEntries.reduce((sum, e) => sum + (e.fuelQty || 0), 0);
+  const monthlyTotalKM = monthEntries.reduce((sum, e) => sum + (totalKM(e) || 0), 0);
+
+  let totalEffectiveKM = 0;
+  monthEntries.forEach(e => {
+    const eff = effectiveKM(e);
+    if (eff != null) totalEffectiveKM += eff;
+  });
+
+  const avgMileage = totalFuel > 0 ? totalEffectiveKM / totalFuel : null;
+  const costPerKM = monthlyTotalKM > 0 ? totalAmount / monthlyTotalKM : null;
+  const avgFuelRate = totalFuel > 0 ? totalAmount / totalFuel : null;
+
+  return { totalAmount, totalFuel, totalKM: monthlyTotalKM, avgMileage, costPerKM, avgFuelRate, entryCount: monthEntries.length };
+}
+
+function updateAnalyticsCards(monthData) {
+  document.getElementById('monthlySpend').textContent = fmtMon(monthData.totalAmount);
+  document.getElementById('monthlyFuel').textContent = fmtN(monthData.totalFuel, 1) + ' L';
+  document.getElementById('monthlyKM').textContent = fmtI(monthData.totalKM) + ' km';
+  document.getElementById('monthlyMileage').textContent = monthData.avgMileage ? fmtN(monthData.avgMileage, 2) + ' km/L' : '—';
+  document.getElementById('costPerKM').textContent = monthData.costPerKM ? '₹' + fmtN(monthData.costPerKM, 2) : '—';
+  document.getElementById('avgFuelRate').textContent = monthData.avgFuelRate ? '₹' + fmtN(monthData.avgFuelRate, 2) : '—';
+}
+
+function getLast12MonthsData() {
+  const months = [];
+  const spending = [];
+  const mileages = [];
+  const costPerKMs = [];
+
+  for (let i = 11; i >= 0; i--) {
+    const date = new Date();
+    date.setMonth(date.getMonth() - i);
+    const monthStr = date.toISOString().slice(0, 7);
+    const monthData = getMonthlyData(monthStr);
+
+    months.push(date.toLocaleDateString('en-IN', { month: 'short', year: '2-digit' }));
+    spending.push(monthData.totalAmount);
+    mileages.push(monthData.avgMileage || 0);
+    costPerKMs.push(monthData.costPerKM || 0);
+  }
+
+  return { months, spending, mileages, costPerKMs };
+}
+
+function updateCharts() {
+  const data12m = getLast12MonthsData();
+
+  updateSpendingChart(data12m);
+  updateMileageChart(data12m);
+  updateCostPerKMChart(data12m);
+}
+
+function updateSpendingChart(data) {
+  const ctx = document.getElementById('spendingChart').getContext('2d');
+
+  if (analyticsCharts.spending) {
+    analyticsCharts.spending.destroy();
+  }
+
+  analyticsCharts.spending = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: data.months,
+      datasets: [{
+        label: 'Monthly Spending (₹)',
+        data: data.spending,
+        backgroundColor: '#2563eb',
+        borderColor: '#1d4ed8',
+        borderWidth: 1,
+        borderRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'Amount (₹)' } } }
+    }
+  });
+}
+
+function updateMileageChart(data) {
+  const ctx = document.getElementById('mileageChart').getContext('2d');
+
+  if (analyticsCharts.mileage) {
+    analyticsCharts.mileage.destroy();
+  }
+
+  analyticsCharts.mileage = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.months,
+      datasets: [{
+        label: 'Average Mileage (km/L)',
+        data: data.mileages,
+        borderColor: '#16a34a',
+        backgroundColor: 'rgba(22, 163, 74, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#16a34a',
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'Mileage (km/L)' } } }
+    }
+  });
+}
+
+function updateCostPerKMChart(data) {
+  const ctx = document.getElementById('costPerKMChart').getContext('2d');
+
+  if (analyticsCharts.costPerKM) {
+    analyticsCharts.costPerKM.destroy();
+  }
+
+  analyticsCharts.costPerKM = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.months,
+      datasets: [{
+        label: 'Cost per KM (₹)',
+        data: data.costPerKMs,
+        borderColor: '#d97706',
+        backgroundColor: 'rgba(217, 119, 6, 0.1)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#d97706',
+        pointRadius: 4
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: true,
+      plugins: { legend: { display: true, position: 'top' } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: 'Cost per KM (₹)' } } }
+    }
+  });
+}
+
+/* ===================== FUEL EFFICIENCY ALERTS ===================== */
+
+function checkAndDisplayAlerts() {
+  const alerts = [];
+
+  if (data.length < 2) {
+    document.getElementById('alertsContainer').style.display = 'none';
+    return;
+  }
+
+  const avgMil = overallAvgMileage();
+  const latestEntry = data.slice().sort((a, b) => (b.endKM ?? 0) - (a.endKM ?? 0))[0];
+
+  // Alert 1: Mileage Drop - If latest entry mileage is significantly below average
+  if (latestEntry && avgMil) {
+    const latestMil = mileage(latestEntry);
+    if (latestMil && latestMil < avgMil * 0.85) {
+      const dropPercent = Math.round((1 - latestMil / avgMil) * 100);
+      alerts.push({
+        type: 'danger',
+        icon: '⚙️',
+        title: 'Mileage Performance Drop',
+        desc: `Latest entry shows ${dropPercent}% below average (${fmtN(latestMil, 2)} vs ${fmtN(avgMil, 2)} km/L). Check vehicle maintenance.`
+      });
+    }
+  }
+
+  // Alert 2: Fuel Price Increase - Compare latest 2 entries
+  if (data.length >= 2) {
+    const sorted = data.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+    const latest = sorted[0];
+    const prev = sorted.slice(1, 5).find(e => e.fuelRate);
+
+    if (latest && prev && latest.fuelRate && prev.fuelRate) {
+      const priceIncrease = latest.fuelRate - prev.fuelRate;
+      if (priceIncrease > 2) {
+        alerts.push({
+          type: 'warning',
+          icon: '⛽',
+          title: 'Fuel Price Increased',
+          desc: `Price jumped by ₹${priceIncrease.toFixed(2)}/L (from ₹${fmtN(prev.fuelRate, 2)} to ₹${fmtN(latest.fuelRate, 2)}). Consider cheaper stations.`
+        });
+      }
+    }
+  }
+
+  // Alert 3: Low Fuel Range - If projected range is low
+  if (latestEntry && latestEntry.projected && latestEntry.projected < 100) {
+    alerts.push({
+      type: 'warning',
+      icon: '🔋',
+      title: 'Low Fuel Range',
+      desc: `Projected range is only ${latestEntry.projected} km. Consider refueling soon.`
+    });
+  }
+
+  // Alert 4: Long Time Since Fill - If more than 7 days since last fill
+  if (latestEntry) {
+    const lastFillDate = new Date(latestEntry.date);
+    const now = new Date();
+    const daysSinceFill = Math.floor((now - lastFillDate) / (1000 * 60 * 60 * 24));
+
+    if (daysSinceFill > 7) {
+      alerts.push({
+        type: 'info',
+        icon: '📅',
+        title: 'Long Time Since Last Fill',
+        desc: `Last fill was ${daysSinceFill} days ago. Haven't been tracking trips?`
+      });
+    }
+  }
+
+  // Display alerts
+  const container = document.getElementById('alertsContainer');
+  let alertHTML = alerts.map(a => `
+    <div class="alert alert-${a.type}">
+      <div class="alert-icon">${a.icon}</div>
+      <div class="alert-content">
+        <div class="alert-title">${a.title}</div>
+        <div class="alert-desc">${a.desc}</div>
+      </div>
+    </div>
+  `).join('');
+
+  if (alerts.length > 0 || data.length >= 3) {
+    container.innerHTML = alertHTML;
+    container.style.display = 'block';
+    displayPredictiveInsights();
+  } else {
+    container.style.display = 'none';
+  }
+}
+
+/* ===================== PREDICTIVE FEATURES ===================== */
+
+function getPredictiveInsights() {
+  if (data.length < 3) return null;
+
+  const sorted = data.slice().sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // Calculate average days between fills
+  const dates = sorted.map(e => new Date(e.date)).filter((d, i) => i < 10);
+  let totalDays = 0;
+  for (let i = 0; i < dates.length - 1; i++) {
+    totalDays += (dates[i] - dates[i + 1]) / (1000 * 60 * 60 * 24);
+  }
+  const avgDaysBetweenFills = dates.length > 1 ? totalDays / (dates.length - 1) : 0;
+
+  // Predict next fill date
+  const lastFillDate = new Date(sorted[0].date);
+  const nextFillDate = new Date(lastFillDate.getTime() + avgDaysBetweenFills * 24 * 60 * 60 * 1000);
+  const daysUntilNextFill = Math.round((nextFillDate - new Date()) / (1000 * 60 * 60 * 24));
+
+  // Average monthly spending
+  const now = new Date();
+  const thisMonthEntries = data.filter(e => {
+    const d = new Date(e.date);
+    return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+  });
+  const thisMonthSpend = thisMonthEntries.reduce((sum, e) => sum + (e.fuelAmount || 0), 0);
+  const avgMonthlySpend = data.reduce((sum, e) => sum + (e.fuelAmount || 0), 0) / Math.max(1, Math.ceil(data.length / (avgDaysBetweenFills > 0 ? avgDaysBetweenFills / 30 : 1)));
+
+  // Fuel price trend
+  const lastPrice = sorted[0].fuelRate || 0;
+  const prevPrice = sorted.slice(1, 6).find(e => e.fuelRate)?.fuelRate || lastPrice;
+  const priceChange = lastPrice - prevPrice;
+
+  // Range accuracy
+  const rangeAccuracyData = sorted.slice(0, 10).map(e => ({
+    projected: e.projected || 0,
+    actual: effectiveKM(e) || 0
+  })).filter(r => r.projected > 0 && r.actual > 0);
+
+  const avgProjected = rangeAccuracyData.length > 0 ? rangeAccuracyData.reduce((s, r) => s + r.projected, 0) / rangeAccuracyData.length : 0;
+  const avgActual = rangeAccuracyData.length > 0 ? rangeAccuracyData.reduce((s, r) => s + r.actual, 0) / rangeAccuracyData.length : 0;
+  const rangeAccuracy = avgProjected > 0 ? (avgActual / avgProjected * 100) : 100;
+
+  return {
+    nextFillDate,
+    daysUntilNextFill,
+    avgDaysBetweenFills,
+    thisMonthSpend,
+    avgMonthlySpend,
+    priceChange,
+    lastPrice,
+    rangeAccuracy
+  };
+}
+
+function displayPredictiveInsights() {
+  const insights = getPredictiveInsights();
+  if (!insights) return;
+
+  const container = document.getElementById('alertsContainer');
+  const nextFillHTML = insights.daysUntilNextFill > 0
+    ? `Expected next fill in ~${insights.daysUntilNextFill} days`
+    : `Next fill date may be soon!`;
+
+  const budgetHTML = insights.avgMonthlySpend > 0
+    ? `Average: ₹${fmtN(insights.avgMonthlySpend, 0)}/month`
+    : 'Not enough data';
+
+  const priceHTML = insights.priceChange > 0
+    ? `Price up by ₹${insights.priceChange.toFixed(2)}/L`
+    : insights.priceChange < 0
+    ? `Price down by ₹${Math.abs(insights.priceChange).toFixed(2)}/L`
+    : 'Price stable';
+
+  const rangeHTML = insights.rangeAccuracy >= 95
+    ? `Very Accurate (${Math.round(insights.rangeAccuracy)}%)`
+    : insights.rangeAccuracy >= 85
+    ? `Good Accuracy (${Math.round(insights.rangeAccuracy)}%)`
+    : `Fair Accuracy (${Math.round(insights.rangeAccuracy)}%)`;
+
+  const predictiveHTML = `
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; border-left: 4px solid #3b82f6;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">📅 Next Fill</div>
+        <div style="font-weight: 700; color: var(--text);">${nextFillHTML}</div>
+      </div>
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; border-left: 4px solid #10b981;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">💰 Budget</div>
+        <div style="font-weight: 700; color: var(--text);">${budgetHTML}</div>
+      </div>
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; border-left: 4px solid #f59e0b;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">⛽ Price Trend</div>
+        <div style="font-weight: 700; color: var(--text);">${priceHTML}</div>
+      </div>
+      <div style="background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 12px; border-left: 4px solid #8b5cf6;">
+        <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">🎯 Range Accuracy</div>
+        <div style="font-weight: 700; color: var(--text);">${rangeHTML}</div>
+      </div>
+    </div>
+  `;
+
+  const alertsHTML = container.innerHTML;
+  container.innerHTML = predictiveHTML + (alertsHTML ? '<div style="margin-top: 12px;">' + alertsHTML + '</div>' : '');
 }
 
 /* ===================== AUTHENTICATION ===================== */
@@ -1108,8 +1805,8 @@ async function showApp(username) {
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('tripContent').style.display = 'none';
   currentView = 'home';
+  initializeVehicles();
   initializeData();
-  // Load trips once on app initialization (data is cached and reused until add/edit/delete)
   loadTrips();
 }
 
@@ -1178,6 +1875,7 @@ function logout() {
 
 /* ===================== INIT ===================== */
 document.addEventListener('DOMContentLoaded', async () => {
+  initializeDarkMode();
   // Auto-login if a stored session token is still valid server-side
   const token = getAuthToken();
   let autoLoggedIn = false;

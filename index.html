@@ -8,6 +8,7 @@
   <meta name="apple-mobile-web-app-title" content="Fuel Log" />
   <title>Car Mileage Tracker</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'><rect fill='%231e293b' width='180' height='180'/><text x='90' y='90' font-size='80' fill='%2360a5fa' text-anchor='middle' dominant-baseline='central' font-family='system-ui'>⛽</text></svg>" />
   <style>
     :root {
@@ -19,6 +20,16 @@
       --text: #0f172a; --text-muted: #64748b; --text-light: #94a3b8;
       --header-bg: #1e293b; --radius: 10px;
       --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 4px 16px rgba(0,0,0,0.06);
+    }
+    body.dark-mode {
+      --primary: #3b82f6; --primary-dark: #2563eb; --primary-light: #1e3a8a;
+      --danger: #f87171; --danger-light: #7f1d1d;
+      --success: #34d399; --success-light: #064e3b;
+      --warning: #fbbf24;
+      --bg: #0f172a; --card: #1e293b; --border: #334155;
+      --text: #f1f5f9; --text-muted: #94a3b8; --text-light: #64748b;
+      --header-bg: #0f172a;
+      --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 4px 16px rgba(0,0,0,0.3);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
@@ -129,6 +140,15 @@
     .toast.success { border-left: 4px solid var(--success); }
     .toast.error   { border-left: 4px solid var(--danger); }
     .empty-state { text-align: center; padding: 60px 20px; color: var(--text-muted); }
+    /* ========== ALERTS ========== */
+    .alert { display: flex; gap: 12px; padding: 12px 16px; border-radius: 8px; margin-bottom: 10px; border-left: 4px solid; font-size: 0.9rem; align-items: flex-start; }
+    .alert-warning { background: #fffbeb; border-left-color: #d97706; color: #92400e; }
+    .alert-danger { background: #fef2f2; border-left-color: #dc2626; color: #7f1d1d; }
+    .alert-info { background: #eff6ff; border-left-color: #2563eb; color: #1e40af; }
+    .alert-icon { font-size: 1.2rem; flex-shrink: 0; margin-top: 2px; }
+    .alert-content { flex: 1; }
+    .alert-title { font-weight: 700; margin-bottom: 2px; }
+    .alert-desc { font-size: 0.85rem; opacity: 0.9; }
     .empty-state p { font-size: 0.9rem; margin-bottom: 16px; }
     /* ========== LOGIN SCREEN ========== */
     .login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); display: flex; align-items: center; justify-content: center; z-index: 300; padding: 16px; }
@@ -180,13 +200,32 @@
     <span class="header-meta">Fuel Log</span>
   </div>
   <div style="display: flex; gap: 8px; align-items: center;">
+    <select id="vehicleSelector" onchange="switchVehicle()" style="padding: 8px 12px; border: 1.5px solid #60a5fa; border-radius: 7px; font-size: 0.9rem; background: var(--header-bg); color: #fff; font-weight: 600; cursor: pointer; min-height: 44px;">
+      <option value="">Loading vehicles...</option>
+    </select>
+    <button class="btn btn-primary" onclick="openVehicleManager()" title="Manage Vehicles" style="padding: 10px 12px; min-width: auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>
+    </button>
+    <button class="btn btn-primary" onclick="undo()" title="Undo (Ctrl+Z)" style="padding: 10px 12px; min-width: auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+    </button>
+    <button class="btn btn-primary" onclick="redo()" title="Redo (Ctrl+Y)" style="padding: 10px 12px; min-width: auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+    </button>
     <button class="btn btn-primary" onclick="handleAddClick()" id="addEntryBtn">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
       Add Entry
     </button>
+    <button class="btn btn-primary" id="analyticsToggleBtn" onclick="toggleAnalyticsView()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18a2 2 0 002 2h16V3"/><path d="M7 12h4M15 8h4M11 16h8M3 8h2M3 12h2M3 16h2"/></svg>
+      Analytics
+    </button>
     <button class="btn btn-primary" id="tripsToggleBtn" onclick="toggleTripsView()">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
       Trip Data
+    </button>
+    <button class="btn btn-cancel" onclick="toggleDarkMode()" id="darkModeBtn" title="Toggle Dark Mode" style="min-height: 44px; padding: 10px 12px; min-width: auto;">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
     <button class="btn btn-cancel" onclick="logout()" style="min-height: 44px; padding: 10px 14px;">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 16l4-4m0 0l-4-4m4 4H7m0 0a4 4 0 01-4-4V5a4 4 0 014-4h4m0 16v4m0-16V3"/></svg>
@@ -203,6 +242,25 @@
     <div class="stat-card"><div class="stat-label">Total KM</div><div class="stat-value" id="sumKM">0</div><div class="stat-sub">driven</div></div>
     <div class="stat-card"><div class="stat-label">Avg Mileage</div><div class="stat-value green" id="sumMileage">&#8212;</div><div class="stat-sub">km/L overall</div></div>
     <div class="stat-card"><div class="stat-label">Avg Rate</div><div class="stat-value" id="sumRate">&#8212;</div><div class="stat-sub">&#8377;/L weighted avg</div></div>
+  </div>
+
+  <!-- ALERTS SECTION -->
+  <div id="alertsContainer" style="display: none; margin-bottom: 18px;"></div>
+
+  <!-- SEARCH & FILTER SECTION -->
+  <div style="background: var(--card); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+    <input type="text" id="searchInput" placeholder="🔍 Search by bunk..." style="flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+
+    <div style="display: flex; gap: 8px;">
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
+        From: <input type="date" id="filterDateFrom" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+      </label>
+      <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
+        To: <input type="date" id="filterDateTo" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem;" oninput="applyFilters()" />
+      </label>
+    </div>
+
+    <button class="btn btn-sm btn-cancel" onclick="clearFilters()" style="white-space: nowrap;">Clear Filters</button>
   </div>
 
   <div class="section-header">
@@ -261,6 +319,62 @@
         </thead>
         <tbody id="tripTableBody"></tbody>
       </table>
+    </div>
+  </div>
+</main>
+
+<!-- ANALYTICS VIEW -->
+<main id="analyticsContent" style="display: none;">
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+    <h1 style="margin: 0; font-size: 1.3rem;">Analytics Dashboard</h1>
+  </div>
+
+  <!-- Monthly Selector -->
+  <div style="margin-bottom: 20px;">
+    <label style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">SELECT MONTH</label>
+    <div style="display: flex; gap: 8px; align-items: center; margin-top: 8px;">
+      <button class="btn btn-sm btn-cancel" onclick="prevMonth()" title="Previous Month">← Prev</button>
+      <select id="monthSelector" onchange="updateAnalytics()" style="flex: 1; padding: 8px 12px; border: 1px solid var(--border); border-radius: 7px; font-size: 0.9rem; background: var(--card); color: var(--text);">
+      </select>
+      <button class="btn btn-sm btn-cancel" onclick="nextMonth()" title="Next Month">Next →</button>
+    </div>
+  </div>
+
+  <!-- Analytics Cards -->
+  <div class="summary-grid" id="analyticsCards">
+    <div class="stat-card"><div class="stat-label">Monthly Spend</div><div class="stat-value" id="monthlySpend">—</div></div>
+    <div class="stat-card"><div class="stat-label">Fuel Filled</div><div class="stat-value amber" id="monthlyFuel">—</div></div>
+    <div class="stat-card"><div class="stat-label">KM Driven</div><div class="stat-value" id="monthlyKM">—</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Mileage</div><div class="stat-value green" id="monthlyMileage">—</div></div>
+    <div class="stat-card"><div class="stat-label">Cost per KM</div><div class="stat-value" id="costPerKM">—</div></div>
+    <div class="stat-card"><div class="stat-label">Avg Fuel Rate</div><div class="stat-value" id="avgFuelRate">—</div></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="table-card" style="margin-bottom: 20px;">
+    <div style="padding: 16px; border-bottom: 1px solid var(--border);">
+      <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Monthly Spending Trend (Last 12 Months)</h3>
+    </div>
+    <div style="padding: 16px;">
+      <canvas id="spendingChart" style="max-height: 300px;"></canvas>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-bottom: 20px;">
+    <div style="padding: 16px; border-bottom: 1px solid var(--border);">
+      <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Mileage Trend (Last 12 Months)</h3>
+    </div>
+    <div style="padding: 16px;">
+      <canvas id="mileageChart" style="max-height: 300px;"></canvas>
+    </div>
+  </div>
+
+  <div class="table-card">
+    <div style="padding: 16px; border-bottom: 1px solid var(--border);">
+      <h3 style="margin: 0; font-size: 0.95rem; font-weight: 700;">Cost per KM Trend (Last 12 Months)</h3>
+    </div>
+    <div style="padding: 16px;">
+      <canvas id="costPerKMChart" style="max-height: 300px;"></canvas>
     </div>
   </div>
 </main>
@@ -474,6 +588,62 @@
     <div class="confirm-actions">
       <button class="btn btn-cancel" onclick="closeTripDelete()">Cancel</button>
       <button class="btn btn-danger" onclick="confirmTripDelete()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- VEHICLE MANAGER MODAL -->
+<div class="overlay" id="vehicleManagerOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title">Manage Vehicles</div>
+      <div class="modal-header-actions">
+        <button class="btn btn-sm btn-primary" onclick="openAddVehicle()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+          Add Vehicle
+        </button>
+        <button class="modal-close" onclick="closeVehicleManager()">&#x2715;</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <div id="vehiclesList"></div>
+    </div>
+  </div>
+</div>
+
+<!-- VEHICLE ADD/EDIT MODAL -->
+<div class="overlay" id="vehicleFormOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-title" id="vehicleFormTitle">Add Vehicle</div>
+      <div class="modal-header-actions">
+        <button class="btn btn-sm btn-cancel" onclick="closeVehicleForm()">Cancel</button>
+        <button class="btn btn-sm btn-primary" onclick="saveVehicle()">Save</button>
+        <button class="modal-close" onclick="closeVehicleForm()">&#x2715;</button>
+      </div>
+    </div>
+    <div class="modal-body">
+      <form id="vehicleForm">
+        <div class="form-grid">
+          <div class="field form-full">
+            <label>Vehicle Name</label>
+            <input type="text" id="vf_name" placeholder="e.g. My Honda City" required />
+          </div>
+          <div class="field">
+            <label>Make/Model</label>
+            <input type="text" id="vf_model" placeholder="e.g. Honda City 2020" />
+          </div>
+          <div class="field">
+            <label>License Plate</label>
+            <input type="text" id="vf_plate" placeholder="e.g. MH-01-AB-1234" />
+          </div>
+          <div class="field">
+            <label>Baseline Mileage (km/L)</label>
+            <input type="number" id="vf_baselineMileage" placeholder="e.g. 15" min="0" step="0.1" />
+            <span class="helper">Expected mileage for this vehicle</span>
+          </div>
+        </div>
+      </form>
     </div>
   </div>
 </div>
