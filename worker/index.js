@@ -9,8 +9,9 @@
 // All /api/data requests require a Bearer session token (see /api/auth/* below) and
 // are scoped to the authenticated user's own rows via user_id.
 
-const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id'];
-const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id'];
+const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id', 'vehicle_id'];
+const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id'];
+const VEHICLE_COLUMNS = ['id', 'user_id', 'name', 'model', 'plate', 'isArchived', 'created_at', 'updated_at'];
 
 // ============ MIGRATIONS ============
 // version = YYYYMMDDHHmmss — add new entries at the bottom, never edit existing ones.
@@ -94,6 +95,32 @@ const MIGRATIONS = [
       `ALTER TABLE trips ADD COLUMN Category TEXT`,
     ],
   },
+  {
+    version: '20260802000000',
+    description: 'add_vehicles_table',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS vehicles (
+         id TEXT PRIMARY KEY,
+         user_id TEXT NOT NULL,
+         name TEXT NOT NULL,
+         model TEXT,
+         plate TEXT,
+         isArchived INTEGER DEFAULT 0,
+         created_at TEXT NOT NULL,
+         updated_at TEXT NOT NULL,
+         FOREIGN KEY(user_id) REFERENCES users(id)
+       )`,
+      `ALTER TABLE fuel_entries ADD COLUMN vehicle_id TEXT`,
+      `ALTER TABLE trips ADD COLUMN vehicle_id TEXT`,
+    ],
+  },
+  {
+    version: '20260802000001',
+    description: 'add_lastVehicleId_to_users',
+    statements: [
+      `ALTER TABLE users ADD COLUMN lastVehicleId TEXT`,
+    ],
+  },
 ];
 
 async function runMigrations(db) {
@@ -145,9 +172,9 @@ async function handleMigrate(request, env) {
 }
 
 function tableFor(sheetParam) {
-  return sheetParam === 'Trips'
-    ? { name: 'trips', columns: TRIP_COLUMNS }
-    : { name: 'fuel_entries', columns: FUEL_COLUMNS };
+  if (sheetParam === 'Trips') return { name: 'trips', columns: TRIP_COLUMNS };
+  if (sheetParam === 'Vehicles') return { name: 'vehicles', columns: VEHICLE_COLUMNS };
+  return { name: 'fuel_entries', columns: FUEL_COLUMNS };
 }
 
 function json(obj, status = 200) {
@@ -299,7 +326,29 @@ async function handleLogout(request, env) {
 async function handleMe(request, env) {
   const session = await requireAuth(request, env.DB);
   if (!session) return json({ success: false, error: 'Unauthorized' }, 401);
-  return json({ success: true, username: session.username });
+
+  const user = await env.DB.prepare('SELECT id, username, lastVehicleId FROM users WHERE id = ?1').bind(session.userId).first();
+  return json({ success: true, username: session.username, lastVehicleId: user?.lastVehicleId });
+}
+
+async function handleSetCurrentVehicle(request, env) {
+  const session = await requireAuth(request, env.DB);
+  if (!session) return json({ success: false, error: 'Unauthorized' }, 401);
+
+  const payload = await readJson(request);
+  if (!payload || !payload.vehicleId) return json({ success: false, error: 'vehicleId required' }, 400);
+
+  const vehicleId = payload.vehicleId;
+  const userId = session.userId;
+
+  // Verify vehicle exists and belongs to user
+  const vehicle = await env.DB.prepare('SELECT id FROM vehicles WHERE id = ?1 AND user_id = ?2').bind(vehicleId, userId).first();
+  if (!vehicle) return json({ success: false, error: 'Vehicle not found or access denied' }, 404);
+
+  // Update user's lastVehicleId
+  await env.DB.prepare('UPDATE users SET lastVehicleId = ?1 WHERE id = ?2').bind(vehicleId, userId).run();
+
+  return json({ success: true, lastVehicleId: vehicleId });
 }
 
 // ============ ENTRY CRUD (scoped to the authenticated user) ============
@@ -467,6 +516,9 @@ export default {
     }
     if (url.pathname === '/api/auth/me' && request.method === 'GET') {
       return handleMe(request, env);
+    }
+    if (url.pathname === '/api/auth/setCurrentVehicle' && request.method === 'POST') {
+      return handleSetCurrentVehicle(request, env);
     }
 
     if (url.pathname === '/api/migrate') {

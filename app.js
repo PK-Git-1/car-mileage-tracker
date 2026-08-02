@@ -32,16 +32,34 @@ function clearAuthSession() {
 
 async function callAppsScript(action, payload = {}) {
   try {
+    const token = getAuthToken();
+    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    // Special handling for 'me' action — calls /api/auth/me
+    if (action === 'me') {
+      const response = await fetch('/api/auth/me', {
+        method: 'GET',
+        headers: authHeaders
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          clearAuthSession();
+          showLoginScreen();
+        }
+        throw new Error(`API Error ${response.status}`);
+      }
+      return await response.json();
+    }
+
     const url = new URL(APPS_SCRIPT_URL, window.location.origin);
     url.searchParams.append('action', action);
 
-    const token = getAuthToken();
-    const authHeaders = token ? { 'Authorization': `Bearer ${token}` } : {};
     let options;
 
     if (action.startsWith('get')) {
       options = { method: 'GET', headers: authHeaders };
       if (payload.id) url.searchParams.append('id', payload.id);
+      if (payload.sheet) url.searchParams.append('sheet', payload.sheet);
     } else {
       options = {
         method: 'POST',
@@ -95,12 +113,15 @@ async function authRequest(path, payload) {
 // Load all data from Google Sheets
 async function loadDataFromAPI() {
   try {
-    console.log('📡 Fetching data from Google Sheets...');
+    console.log(`📡 Fetching data for vehicle: ${currentVehicleId}`);
     const result = await callAppsScript('get');
     if (result.success) {
       let json = result.data || [];
+
+      // Filter entries by current vehicle
+      json = json.filter(entry => entry.vehicle_id === currentVehicleId || !entry.vehicle_id);
       console.log('✓ Data loaded:', json.length, 'entries');
-      
+
       // Normalize date format for all entries and fix timezone issues
       if (Array.isArray(json)) {
         json = json.map(entry => {
@@ -112,7 +133,7 @@ async function loadDataFromAPI() {
           return entry;
         });
       }
-      
+
       return Array.isArray(json) ? json : [];
     }
     throw new Error(result.error || 'Failed to load data');
@@ -213,10 +234,12 @@ async function initializeData() {
   document.getElementById('tableBody').innerHTML =
     '<tr><td colspan="13"><div style="text-align:center;padding:48px 20px;">' +
     '<div class="spinner"></div>' +
-    '<p style="color:var(--text-muted);font-size:0.85rem;">Loading data from Google Sheets…</p>' +
+    '<p style="color:var(--text-muted);font-size:0.85rem;">Loading data…</p>' +
     '</div></td></tr>';
+
+  await initializeVehicles();
   data = await loadDataFromAPI();
-  console.log(`Loaded ${data.length} entries from Google Sheets`);
+  console.log(`Loaded ${data.length} entries`);
   saveToHistory();
   render();
 }
@@ -721,6 +744,7 @@ async function saveFormData() {
     fuelRate: parseFloat(document.getElementById('f_rate').value) || null,
     fuelQty: parseFloat(document.getElementById('f_qty').value) || null,
     projected: parseFloat(document.getElementById('f_projected').value) || null,
+    vehicle_id: currentVehicleId,
   };
 
   if (!entry.bunk || !entry.date) {
@@ -787,16 +811,52 @@ let vehicles = [];
 let currentVehicleId = null;
 let vehicleEditId = null;
 
-function initializeVehicles() {
-  const stored = localStorage.getItem('vehicles');
-  vehicles = stored ? JSON.parse(stored) : [];
-  const savedVehicleId = localStorage.getItem('currentVehicleId');
-  currentVehicleId = savedVehicleId || (vehicles.length > 0 ? vehicles[0].id : null);
+async function initializeVehicles() {
+  try {
+    // Fetch vehicles from backend
+    const result = await callAppsScript('get', { sheet: 'Vehicles' });
+    if (result.success) {
+      vehicles = result.data.filter(v => !v.isArchived);
+    }
+
+    // Get current vehicle ID from user profile
+    const meResult = await callAppsScript('me');
+    if (meResult.success && meResult.lastVehicleId) {
+      currentVehicleId = meResult.lastVehicleId;
+      // Verify it still exists and is not archived
+      const exists = vehicles.find(v => v.id === currentVehicleId);
+      if (!exists) {
+        currentVehicleId = vehicles.length > 0 ? vehicles[0].id : null;
+        if (currentVehicleId) await setCurrentVehicle(currentVehicleId);
+      }
+    } else if (vehicles.length > 0) {
+      currentVehicleId = vehicles[0].id;
+      await setCurrentVehicle(currentVehicleId);
+    }
+  } catch (err) {
+    console.error('Failed to initialize vehicles:', err);
+    showToast('❌ Failed to load vehicles', 'error');
+  }
   populateVehicleSelector();
 }
 
-function saveVehiclesToStorage() {
-  localStorage.setItem('vehicles', JSON.stringify(vehicles));
+async function setCurrentVehicle(vehicleId) {
+  try {
+    const result = await fetch('/api/auth/setCurrentVehicle', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${getAuthToken()}`
+      },
+      body: JSON.stringify({ vehicleId })
+    });
+    const data = await result.json();
+    if (data.success) {
+      currentVehicleId = vehicleId;
+    }
+  } catch (err) {
+    console.error('Failed to set current vehicle:', err);
+  }
 }
 
 function populateVehicleSelector() {
@@ -809,11 +869,10 @@ function populateVehicleSelector() {
   }
 }
 
-function switchVehicle() {
+async function switchVehicle() {
   const vehicleId = document.getElementById('vehicleSelector').value;
   if (vehicleId) {
-    currentVehicleId = vehicleId;
-    localStorage.setItem('currentVehicleId', vehicleId);
+    await setCurrentVehicle(vehicleId);
     render();
   }
 }
@@ -859,49 +918,85 @@ function editVehicle(vehicleId) {
   document.getElementById('vf_name').value = vehicle.name;
   document.getElementById('vf_model').value = vehicle.model || '';
   document.getElementById('vf_plate').value = vehicle.plate || '';
-  document.getElementById('vf_baselineMileage').value = vehicle.baselineMileage || '';
   document.getElementById('vehicleFormOverlay').classList.add('open');
 }
 
-function saveVehicle() {
+async function saveVehicle() {
   const name = document.getElementById('vf_name').value.trim();
   const model = document.getElementById('vf_model').value.trim();
   const plate = document.getElementById('vf_plate').value.trim();
-  const baselineMileage = parseFloat(document.getElementById('vf_baselineMileage').value) || null;
 
   if (!name) {
     showToast('❌ Vehicle name required', 'error');
     return;
   }
 
-  if (vehicleEditId) {
-    const idx = vehicles.findIndex(v => v.id === vehicleEditId);
-    if (idx >= 0) {
-      vehicles[idx] = { ...vehicles[idx], name, model, plate, baselineMileage };
-      showToast('✓ Vehicle updated', 'success');
+  try {
+    if (vehicleEditId) {
+      // Update vehicle
+      const result = await callAppsScript('update', {
+        sheet: 'Vehicles',
+        id: vehicleEditId,
+        updates: { name, model, plate, updated_at: new Date().toISOString() }
+      });
+      if (result.success) {
+        showToast('✓ Vehicle updated', 'success');
+      } else {
+        showToast('❌ Failed to update vehicle', 'error');
+        return;
+      }
+    } else {
+      // Add new vehicle
+      const vehicle = {
+        id: crypto.randomUUID ? crypto.randomUUID() : uid(),
+        name,
+        model,
+        plate,
+        isArchived: 0,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const result = await callAppsScript('add', { sheet: 'Vehicles', entry: vehicle });
+      if (result.success) {
+        showToast('✓ Vehicle added', 'success');
+      } else {
+        showToast('❌ Failed to add vehicle', 'error');
+        return;
+      }
     }
-  } else {
-    vehicles.push({ id: uid(), name, model, plate, baselineMileage, createdAt: new Date().toISOString() });
-    showToast('✓ Vehicle added', 'success');
-  }
 
-  saveVehiclesToStorage();
-  populateVehicleSelector();
+    await initializeVehicles();
+    populateVehicleSelector();
   closeVehicleForm();
   openVehicleManager();
 }
 
-function deleteVehicle(vehicleId) {
-  if (confirm('Delete this vehicle? All associated fuel entries will remain.')) {
-    vehicles = vehicles.filter(v => v.id !== vehicleId);
-    if (currentVehicleId === vehicleId) {
-      currentVehicleId = vehicles.length > 0 ? vehicles[0].id : null;
-      localStorage.setItem('currentVehicleId', currentVehicleId || '');
+async function deleteVehicle(vehicleId) {
+  if (confirm('Archive this vehicle? Historical data will be preserved.')) {
+    try {
+      // Archive the vehicle instead of deleting
+      const result = await callAppsScript('update', {
+        sheet: 'Vehicles',
+        id: vehicleId,
+        updates: { isArchived: 1, updated_at: new Date().toISOString() }
+      });
+      if (result.success) {
+        if (currentVehicleId === vehicleId) {
+          const remaining = vehicles.filter(v => v.id !== vehicleId);
+          currentVehicleId = remaining.length > 0 ? remaining[0].id : null;
+          if (currentVehicleId) await setCurrentVehicle(currentVehicleId);
+        }
+        await initializeVehicles();
+        populateVehicleSelector();
+        showToast('✓ Vehicle archived', 'success');
+        openVehicleManager();
+      } else {
+        showToast('❌ Failed to archive vehicle', 'error');
+      }
+    } catch (err) {
+      console.error('Error archiving vehicle:', err);
+      showToast('❌ Error archiving vehicle', 'error');
     }
-    saveVehiclesToStorage();
-    populateVehicleSelector();
-    openVehicleManager();
-    showToast('✓ Vehicle deleted', 'success');
   }
 }
 
@@ -1176,7 +1271,7 @@ async function saveTripEntry(e) {
   try {
     if (tripEditId) {
       // Update existing trip - match sheet headers exactly
-      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes, Mileage: tripMileage, Category: category };
+      const updates = { Fuel_Id: resolvedFuelId, Date: date, StartKM: startKM, EndKM: endKM, Distance: distance, Notes: notes, Mileage: tripMileage, Category: category, vehicle_id: currentVehicleId };
       if (toGoKM !== null) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
@@ -1207,7 +1302,8 @@ async function saveTripEntry(e) {
         Diff: diff,
         Notes: notes,
         Mileage: tripMileage,
-        Category: category
+        Category: category,
+        vehicle_id: currentVehicleId
       };
       console.log('📤 API Add payload:', newTrip);
       const result = await callTripsAPI('add', { entry: newTrip });
