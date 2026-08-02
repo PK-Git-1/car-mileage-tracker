@@ -967,8 +967,12 @@ async function saveVehicle() {
 
     await initializeVehicles();
     populateVehicleSelector();
-  closeVehicleForm();
-  openVehicleManager();
+    closeVehicleForm();
+    openVehicleManager();
+  } catch (err) {
+    console.error('Error saving vehicle:', err);
+    showToast('❌ Error saving vehicle', 'error');
+  }
 }
 
 async function deleteVehicle(vehicleId) {
