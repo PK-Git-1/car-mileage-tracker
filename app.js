@@ -1009,6 +1009,15 @@ function closeVehicleForm() {
   vehicleEditId = null;
 }
 
+/* ===================== MOBILE MENU ===================== */
+
+function toggleMobileMenu() {
+  const menu = document.getElementById('mobileMenu');
+  const btn = document.getElementById('hamburgerBtn');
+  menu.classList.toggle('open');
+  btn.classList.toggle('open');
+}
+
 /* ===================== DARK MODE ===================== */
 
 function initializeDarkMode() {

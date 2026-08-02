@@ -34,7 +34,17 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
     body, html { width: 100%; overflow-x: hidden; }
-    header { background: var(--header-bg); color: #fff; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); padding-top: max(0px, env(safe-area-inset-top)); }
+    header { background: var(--header-bg); color: #fff; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; box-shadow: 0 2px 8px rgba(0,0,0,0.2); padding-top: max(0px, env(safe-area-inset-top)); flex-wrap: wrap; }
+    .header-actions { display: flex; gap: 8px; align-items: center; }
+    .header-actions-desktop { display: flex; gap: 8px; }
+    .header-actions-mobile { display: none; }
+    .hamburger-menu { display: none; flex-direction: column; gap: 4px; cursor: pointer; background: none; border: none; color: #fff; padding: 8px; }
+    .hamburger-menu span { width: 20px; height: 2px; background: #fff; display: block; }
+    #mobileMenu { display: none; position: absolute; top: 56px; left: 0; right: 0; background: var(--header-bg); z-index: 99; flex-direction: column; gap: 0; padding: 8px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+    #mobileMenu.open { display: flex; }
+    #mobileMenu button { width: 100%; text-align: left; background: none; border: none; color: #fff; padding: 12px 16px; cursor: pointer; font-size: 0.9rem; display: flex; align-items: center; gap: 8px; }
+    #mobileMenu button:hover { background: rgba(255,255,255,0.1); }
+    #mobileMenu button svg { width: 14px; height: 14px; }
     .header-brand { display: flex; align-items: center; gap: 8px; font-size: 1rem; font-weight: 700; white-space: nowrap; }
     .header-meta { font-size: 0.70rem; color: #94a3b8; font-weight: 400; display: none; }
     main { max-width: 1440px; margin: 16px auto; padding: 0 12px 80px; padding-bottom: max(80px, calc(12px + env(safe-area-inset-bottom))); }
@@ -177,15 +187,64 @@
       .file-name { max-width: 120px; }
       .header-meta { display: none; }
 
-      /* Grid table with horizontal scroll instead of stacked cards */
+      /* Tablet header */
+      .header-actions-desktop { display: none; }
+      .hamburger-menu { display: flex; }
+
+      /* Hide Start KM, End KM on tablets */
+      #tripTableBody tr td:nth-child(2),
+      #tripTableBody tr td:nth-child(3),
+      thead th:nth-child(2),
+      thead th:nth-child(3) { display: none; }
+
+      /* Grid table with horizontal scroll */
       .table-wrapper { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-      .table-card table { min-width: 720px; }
+      .table-card table { min-width: 600px; }
     }
     @media (max-width: 480px) {
       .summary-grid { grid-template-columns: 1fr; }
-      table { font-size: 0.7rem; }
+      table { font-size: 0.73rem; }
+      table th { padding: 8px 5px; font-size: 0.53rem; }
+      table td { padding: 8px 5px; }
       .modal { max-height: 95vh; }
       .file-actions { flex-direction: column; align-items: flex-start; }
+
+      /* Mobile header optimization */
+      .header-brand { flex: 1; }
+      #headerTitle { display: block !important; }
+      header { gap: 8px; }
+      #vehicleSelector { flex: 1; min-width: 120px; font-size: 0.85rem; }
+      .header-actions { gap: 4px; flex: 1; }
+
+      /* Mobile: show only Date, Distance, Diff, Category, Actions */
+      /* Hide: Start KM (2), End KM (3), To Go KM (5), Mileage (7), Notes (9) */
+      thead th:nth-child(2),
+      thead th:nth-child(3),
+      thead th:nth-child(5),
+      thead th:nth-child(7),
+      thead th:nth-child(9),
+      #tripTableBody tr td:nth-child(2),
+      #tripTableBody tr td:nth-child(3),
+      #tripTableBody tr td:nth-child(5),
+      #tripTableBody tr td:nth-child(7),
+      #tripTableBody tr td:nth-child(9) { display: none; }
+
+      .table-card table { min-width: auto; width: 100%; }
+      .table-wrapper { overflow-x: visible; }
+      table { border-collapse: collapse; }
+
+      /* Compact mobile layout */
+      table th, table td { text-align: left; }
+      td.num { text-align: right; padding-right: 8px; }
+      .cell-actions { padding: 4px 2px; }
+      .actions { flex-wrap: wrap; gap: 4px; }
+      .btn-sm { padding: 4px 6px; min-height: 32px; }
+
+      /* Ensure Date column is readable */
+      thead th:nth-child(1) { min-width: 70px; }
+
+      /* Mobile menu positioning */
+      #mobileMenu { top: 56px; }
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--primary); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px; }
@@ -196,41 +255,65 @@
 <header>
   <div class="header-brand">
     <i class="fas fa-car" style="font-size: 1.4rem; color: #60a5fa;"></i>
-    Car Mileage Tracker
-    <span class="header-meta">Fuel Log</span>
+    <span style="display: none;" id="headerTitle">Car Mileage Tracker</span>
   </div>
-  <div style="display: flex; gap: 8px; align-items: center;">
+
+  <div class="header-actions">
+    <!-- Vehicle selector (visible on all sizes) -->
     <select id="vehicleSelector" onchange="switchVehicle()" style="padding: 8px 12px; border: 1.5px solid #60a5fa; border-radius: 7px; font-size: 0.9rem; background: var(--header-bg); color: #fff; font-weight: 600; cursor: pointer; min-height: 44px;">
       <option value="">Loading vehicles...</option>
     </select>
-    <button class="btn btn-primary" onclick="openVehicleManager()" title="Manage Vehicles" style="padding: 10px 12px; min-width: auto;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>
+
+    <!-- Desktop actions (hidden on mobile) -->
+    <div class="header-actions-desktop">
+      <button class="btn btn-primary" onclick="openVehicleManager()" title="Manage Vehicles" style="padding: 10px 12px; min-width: auto;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="1"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>
+      </button>
+      <button class="btn btn-primary" onclick="undo()" title="Undo (Ctrl+Z)" style="padding: 10px 12px; min-width: auto;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
+      </button>
+      <button class="btn btn-primary" onclick="redo()" title="Redo (Ctrl+Y)" style="padding: 10px 12px; min-width: auto;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
+      </button>
+      <button class="btn btn-primary" onclick="handleAddClick()" id="addEntryBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+        Add Entry
+      </button>
+      <button class="btn btn-primary" id="analyticsToggleBtn" onclick="toggleAnalyticsView()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18a2 2 0 002 2h16V3"/><path d="M7 12h4M15 8h4M11 16h8M3 8h2M3 12h2M3 16h2"/></svg>
+        Analytics
+      </button>
+      <button class="btn btn-primary" id="tripsToggleBtn" onclick="toggleTripsView()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
+        Trip Data
+      </button>
+      <button class="btn btn-cancel" onclick="toggleDarkMode()" id="darkModeBtn" title="Toggle Dark Mode" style="min-height: 44px; padding: 10px 12px; min-width: auto;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+      </button>
+      <button class="btn btn-cancel" onclick="logout()" style="min-height: 44px; padding: 10px 14px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 16l4-4m0 0l-4-4m4 4H7m0 0a4 4 0 01-4-4V5a4 4 0 014-4h4m0 16v4m0-16V3"/></svg>
+        Logout
+      </button>
+    </div>
+
+    <!-- Mobile hamburger menu button -->
+    <button class="hamburger-menu" id="hamburgerBtn" onclick="toggleMobileMenu()">
+      <span></span>
+      <span></span>
+      <span></span>
     </button>
-    <button class="btn btn-primary" onclick="undo()" title="Undo (Ctrl+Z)" style="padding: 10px 12px; min-width: auto;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 00-9-9 9 9 0 00-6 2.3L3 13"/></svg>
-    </button>
-    <button class="btn btn-primary" onclick="redo()" title="Redo (Ctrl+Y)" style="padding: 10px 12px; min-width: auto;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 019-9 9 9 0 016 2.3l3 2.7"/></svg>
-    </button>
-    <button class="btn btn-primary" onclick="handleAddClick()" id="addEntryBtn">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-      Add Entry
-    </button>
-    <button class="btn btn-primary" id="analyticsToggleBtn" onclick="toggleAnalyticsView()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18a2 2 0 002 2h16V3"/><path d="M7 12h4M15 8h4M11 16h8M3 8h2M3 12h2M3 16h2"/></svg>
-      Analytics
-    </button>
-    <button class="btn btn-primary" id="tripsToggleBtn" onclick="toggleTripsView()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 3H5a2 2 0 00-2 2v4m0 0H3m2 0v16a2 2 0 002 2h12a2 2 0 002-2v-6m0 0h2m-2 0v-4m0 0V5a2 2 0 00-2-2h-4m0 16H9m3-13v6m3-6v6"/></svg>
-      Trip Data
-    </button>
-    <button class="btn btn-cancel" onclick="toggleDarkMode()" id="darkModeBtn" title="Toggle Dark Mode" style="min-height: 44px; padding: 10px 12px; min-width: auto;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
-    </button>
-    <button class="btn btn-cancel" onclick="logout()" style="min-height: 44px; padding: 10px 14px;">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 16l4-4m0 0l-4-4m4 4H7m0 0a4 4 0 01-4-4V5a4 4 0 014-4h4m0 16v4m0-16V3"/></svg>
-      Logout
-    </button>
+  </div>
+
+  <!-- Mobile menu (hidden by default) -->
+  <div id="mobileMenu">
+    <button onclick="openVehicleManager(); toggleMobileMenu();">⚙️ Manage Vehicles</button>
+    <button onclick="undo(); toggleMobileMenu();">↶ Undo</button>
+    <button onclick="redo(); toggleMobileMenu();">↷ Redo</button>
+    <button onclick="handleAddClick(); toggleMobileMenu();">➕ Add Entry</button>
+    <button onclick="toggleAnalyticsView(); toggleMobileMenu();">📊 Analytics</button>
+    <button onclick="toggleTripsView(); toggleMobileMenu();">📍 Trips</button>
+    <button onclick="toggleDarkMode(); toggleMobileMenu();">🌙 Dark Mode</button>
+    <button onclick="logout(); toggleMobileMenu();">🚪 Logout</button>
   </div>
 </header>
 
