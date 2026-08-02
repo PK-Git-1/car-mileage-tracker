@@ -10,7 +10,7 @@
 // are scoped to the authenticated user's own rows via user_id.
 
 const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id', 'vehicle_id'];
-const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id'];
+const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id', 'FuelConsumed'];
 const VEHICLE_COLUMNS = ['id', 'user_id', 'name', 'model', 'plate', 'isArchived', 'created_at', 'updated_at'];
 
 // ============ MIGRATIONS ============
@@ -119,6 +119,13 @@ const MIGRATIONS = [
     description: 'add_lastVehicleId_to_users',
     statements: [
       `ALTER TABLE users ADD COLUMN lastVehicleId TEXT`,
+    ],
+  },
+  {
+    version: '20260802000002',
+    description: 'add_fuel_consumed_to_trips',
+    statements: [
+      `ALTER TABLE trips ADD COLUMN FuelConsumed REAL`,
     ],
   },
 ];

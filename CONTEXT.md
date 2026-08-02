@@ -25,6 +25,17 @@ effectiveKM = (endKM - startKM) + remainingKM - incomingKM
 mileage = effectiveKM / fuelQty (where fuelQty > 0)
 ```
 
+### User
+An authenticated user of the app, with credentials and session state.
+
+**Attributes:**
+- `id` — unique identifier (UUID)
+- `username` — login name (3-32 chars, alphanumeric + . _ -)
+- `password_hash` — PBKDF2 hash (100k iterations, SHA-256, 256-bit)
+- `password_salt` — hex-encoded salt for password hashing
+- `created_at` — timestamp when account was created
+- `lastVehicleId` — current vehicle ID (for session persistence across devices)
+
 ### Vehicle
 A car or vehicle that the user tracks fuel and trips for.
 
@@ -34,7 +45,7 @@ A car or vehicle that the user tracks fuel and trips for.
 - `name` — display name (e.g., "Honda Civic", "Work Car")
 - `model` — vehicle model (optional, e.g., "2020 Honda Civic")
 - `plate` — license plate (optional, for identification)
-- `isArchived` — soft-delete flag (default: false); archived vehicles don't appear in UI but data is preserved
+- `isArchived` — soft-delete flag (default: 0); archived vehicles don't appear in UI but data is preserved
 - `created_at` — timestamp when vehicle was added
 - `updated_at` — timestamp when vehicle was last modified
 
@@ -55,10 +66,16 @@ A journey between two odometer readings, scoped to a fuel entry (part of a fuel 
 - `Diff` — delta from previous trip (context/metadata)
 - `Notes` — trip notes/purpose
 - `Category` — trip purpose tag (e.g., "work", "personal", "leisure")
-- `FuelConsumed` — proportional share of fuel entry's total (calculated, see below)
+- `FuelConsumed` — proportional share of fuel entry's total (REAL, calculated on mutation)
 - `Mileage` — trip efficiency (calculated: Distance / FuelConsumed, or NULL if FuelConsumed = 0)
 - `user_id` — owner (scoped to authenticated user)
 - `vehicle_id` — link to vehicle (foreign key)
+
+**Calculated Field (Proportional Fuel Allocation):**
+```
+trip.FuelConsumed = fuel.fuelQty × (trip.Distance / sum(trip.Distance for all trips in batch where Distance > 0))
+trip.Mileage = trip.Distance / trip.FuelConsumed (or NULL if FuelConsumed = 0)
+```
 
 ## Fuel Batch
 
