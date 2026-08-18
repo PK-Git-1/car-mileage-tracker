@@ -609,11 +609,17 @@ function switchModalTab(tab) {
   if (tab === 'trips' && editId) renderFuelTrips(editId);
 }
 
-// Look up the Petrol Bunk name for a given fuel entry id (for display in the Trip form)
-function getBunkNameForFuelId(fuelId) {
-  if (!fuelId) return '';
-  const entry = data.find(e => String(e.id) === String(fuelId));
-  return entry ? (entry.bunk || '') : '';
+// Populate the Petrol Bunk (Reference) dropdown in the Trip form from the current
+// vehicle's fuel entries, most recent first, and select the given fuel entry id (if any)
+function populateTripFuelSelect(selectedFuelId) {
+  const sel = document.getElementById('trip_fuelId');
+  const sorted = data.slice().sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const options = sorted.map(e => {
+    const label = `${e.date || '(no date)'} — ${e.bunk || 'Unknown bunk'} (${e.startKM ?? '?'}–${e.endKM ?? '?'} km)`;
+    return `<option value="${e.id}">${label}</option>`;
+  }).join('');
+  sel.innerHTML = '<option value="">— Select fuel entry —</option>' + options;
+  sel.value = selectedFuelId || '';
 }
 
 // Render the trips linked to this fuel entry (matched via Fuel_Id) inside the Trips tab
@@ -1148,12 +1154,13 @@ async function openAddTrip() {
   document.getElementById('trip_toGoKM')._userEdited = false;
   calcTripDistance();
 
-  // Fetch and populate the latest Fuel ID
+  populateTripFuelSelect('');
+
+  // Fetch and select the latest Fuel entry
   try {
     const result = await callAppsScript('getLastFuelId');
     if (result.success && result.lastFuelId) {
       document.getElementById('trip_fuelId').value = result.lastFuelId;
-      document.getElementById('trip_fuelBunk').value = getBunkNameForFuelId(result.lastFuelId);
     }
   } catch (err) {
     console.error('Error fetching last fuel ID:', err.message);
@@ -1181,8 +1188,7 @@ function openEditTrip(id) {
   const notes = trip.Notes || trip.notes || '';
 
   // Use formatDateForInput to ensure proper YYYY-MM-DD format
-  document.getElementById('trip_fuelId').value = fuelId;
-  document.getElementById('trip_fuelBunk').value = getBunkNameForFuelId(fuelId);
+  populateTripFuelSelect(fuelId);
   document.getElementById('trip_date').value = formatDateForInput(tripDate);
   document.getElementById('trip_startKM').value = startKM;
   document.getElementById('trip_endKM').value = endKM;
@@ -1214,8 +1220,7 @@ function resetTripForm() {
   document.getElementById('trip_date').value = new Date().toISOString().slice(0, 10);
   document.getElementById('tripDistanceDisplay').textContent = '0 km';
   document.getElementById('trip_distance').value = '0';
-  document.getElementById('trip_fuelId').value = '';
-  document.getElementById('trip_fuelBunk').value = '';
+  populateTripFuelSelect('');
   document.getElementById('trip_toGoKM').value = '';
   document.getElementById('trip_toGoKM')._userEdited = false;
   document.getElementById('trip_diff').value = '';
