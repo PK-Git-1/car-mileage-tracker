@@ -37,3 +37,6 @@ _dev/
 !.dev.vars.example
 .env*
 !.env.example
+
+# Local-only Claude Code guidance (not shared to remote)
+CLAUDE.md
