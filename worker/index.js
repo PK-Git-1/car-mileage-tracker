@@ -10,7 +10,7 @@
 // are scoped to the authenticated user's own rows via user_id.
 
 const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id', 'vehicle_id'];
-const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id', 'FuelConsumed'];
+const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'ToKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id', 'FuelConsumed'];
 const VEHICLE_COLUMNS = ['id', 'user_id', 'name', 'model', 'plate', 'isArchived', 'created_at', 'updated_at'];
 
 // ============ MIGRATIONS ============
@@ -126,6 +126,13 @@ const MIGRATIONS = [
     description: 'add_fuel_consumed_to_trips',
     statements: [
       `ALTER TABLE trips ADD COLUMN FuelConsumed REAL`,
+    ],
+  },
+  {
+    version: '20260823000000',
+    description: 'add_ToKM_to_trips',
+    statements: [
+      `ALTER TABLE trips ADD COLUMN ToKM REAL`,
     ],
   },
 ];
@@ -374,6 +381,16 @@ async function getLastFuelId(db, userId) {
   return row ? row.id : null;
 }
 
+async function getLastTripId(db, userId) {
+  const row = await db.prepare('SELECT id FROM trips WHERE user_id = ?1 ORDER BY rowid DESC LIMIT 1').bind(userId).first();
+  return row ? row.id : null;
+}
+
+async function isLatestTrip(db, tripId, userId) {
+  const lastTripId = await getLastTripId(db, userId);
+  return lastTripId === tripId;
+}
+
 async function addEntry(db, table, entry, userId) {
   entry.id = entry.id || crypto.randomUUID();
   entry.user_id = userId;
@@ -384,6 +401,24 @@ async function addEntry(db, table, entry, userId) {
   const values = table.columns.map(col => entry[col] ?? null);
   await db.prepare(`INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${placeholders})`)
     .bind(...values).run();
+
+  // If adding a new trip with a Fuel_Id, update the fuel entry with trip's ToGoKM and ToKM
+  // Only update fuel for the newly created trip (it will be the latest)
+  if (table.name === 'trips' && entry.Fuel_Id) {
+    const isLatest = await isLatestTrip(db, entry.id, userId);
+    if (isLatest) {
+      const fuelEntry = await getEntry(db, tableFor('Sheet1'), entry.Fuel_Id, userId);
+      if (fuelEntry) {
+        const fuelUpdates = {};
+        if (entry.ToGoKM != null) fuelUpdates.remainingKM = entry.ToGoKM;
+        if (entry.ToKM != null) fuelUpdates.endKM = entry.ToKM;
+        if (Object.keys(fuelUpdates).length > 0) {
+          await updateEntry(db, tableFor('Sheet1'), entry.Fuel_Id, fuelUpdates, userId);
+        }
+      }
+    }
+  }
+
   return { success: true, entry };
 }
 
@@ -395,6 +430,23 @@ async function updateEntry(db, table, id, updates, userId) {
   const values = table.columns.filter(c => c !== 'id').map(col => merged[col] ?? null);
   await db.prepare(`UPDATE ${table.name} SET ${setClause} WHERE id = ?${values.length + 1} AND user_id = ?${values.length + 2}`)
     .bind(...values, id, userId).run();
+
+  // If updating a trip with a Fuel_Id, only sync ToGoKM and ToKM back to the fuel entry if this is the latest trip
+  if (table.name === 'trips' && merged.Fuel_Id) {
+    const isLatest = await isLatestTrip(db, id, userId);
+    if (isLatest) {
+      const fuelEntry = await getEntry(db, tableFor('Sheet1'), merged.Fuel_Id, userId);
+      if (fuelEntry) {
+        const fuelUpdates = {};
+        if (updates.ToGoKM != null) fuelUpdates.remainingKM = updates.ToGoKM;
+        if (updates.ToKM != null) fuelUpdates.endKM = updates.ToKM;
+        if (Object.keys(fuelUpdates).length > 0) {
+          await updateEntry(db, tableFor('Sheet1'), merged.Fuel_Id, fuelUpdates, userId);
+        }
+      }
+    }
+  }
+
   return { success: true, entry: merged };
 }
 
