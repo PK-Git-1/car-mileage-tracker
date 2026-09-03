@@ -376,6 +376,19 @@ async function getEntry(db, table, id, userId) {
   return await db.prepare(`SELECT * FROM ${table.name} WHERE id = ?1 AND user_id = ?2`).bind(id, userId).first();
 }
 
+// Mirrors app.js's mileage()/effectiveKM() formula (and the backfill_mileage migration):
+// effectiveKM = (endKM - startKM) + remainingKM - incomingKM; mileage = effectiveKM / fuelQty
+function calcFuelMileage(fuelEntry) {
+  const startKM = parseFloat(fuelEntry.startKM);
+  const endKM = parseFloat(fuelEntry.endKM);
+  const fuelQty = parseFloat(fuelEntry.fuelQty);
+  if (isNaN(startKM) || isNaN(endKM) || !fuelQty) return null;
+  const remainingKM = parseFloat(fuelEntry.remainingKM) || 0;
+  const incomingKM = parseFloat(fuelEntry.incomingKM) || 0;
+  const effectiveKM = (endKM - startKM) + remainingKM - incomingKM;
+  return Math.round((effectiveKM / fuelQty) * 100) / 100;
+}
+
 async function getLastFuelId(db, userId) {
   const row = await db.prepare('SELECT id FROM fuel_entries WHERE user_id = ?1 ORDER BY rowid DESC LIMIT 1').bind(userId).first();
   return row ? row.id : null;
@@ -402,7 +415,8 @@ async function addEntry(db, table, entry, userId) {
   await db.prepare(`INSERT INTO ${table.name} (${table.columns.join(', ')}) VALUES (${placeholders})`)
     .bind(...values).run();
 
-  // If adding a new trip with a Fuel_Id, update the fuel entry with trip's ToGoKM and ToKM
+  // If adding a new trip with a Fuel_Id, update the fuel entry with the trip's ToGoKM
+  // and EndKM (the odometer reading at the pump, for the latest trip)
   // Only update fuel for the newly created trip (it will be the latest)
   if (table.name === 'trips' && entry.Fuel_Id) {
     const isLatest = await isLatestTrip(db, entry.id, userId);
@@ -411,9 +425,15 @@ async function addEntry(db, table, entry, userId) {
       if (fuelEntry) {
         const fuelUpdates = {};
         if (entry.ToGoKM != null) fuelUpdates.remainingKM = entry.ToGoKM;
-        if (entry.ToKM != null) fuelUpdates.endKM = entry.ToKM;
+        if (entry.EndKM != null) fuelUpdates.endKM = entry.EndKM;
         if (Object.keys(fuelUpdates).length > 0) {
+          const newMileage = calcFuelMileage({ ...fuelEntry, ...fuelUpdates });
+          if (newMileage != null) fuelUpdates.mileage = newMileage;
           await updateEntry(db, tableFor('Sheet1'), entry.Fuel_Id, fuelUpdates, userId);
+          if (newMileage != null) {
+            await updateEntry(db, table, entry.id, { Mileage: newMileage }, userId);
+            entry.Mileage = newMileage;
+          }
         }
       }
     }
@@ -431,7 +451,7 @@ async function updateEntry(db, table, id, updates, userId) {
   await db.prepare(`UPDATE ${table.name} SET ${setClause} WHERE id = ?${values.length + 1} AND user_id = ?${values.length + 2}`)
     .bind(...values, id, userId).run();
 
-  // If updating a trip with a Fuel_Id, only sync ToGoKM and ToKM back to the fuel entry if this is the latest trip
+  // If updating a trip with a Fuel_Id, only sync ToGoKM and EndKM back to the fuel entry if this is the latest trip
   if (table.name === 'trips' && merged.Fuel_Id) {
     const isLatest = await isLatestTrip(db, id, userId);
     if (isLatest) {
@@ -439,9 +459,15 @@ async function updateEntry(db, table, id, updates, userId) {
       if (fuelEntry) {
         const fuelUpdates = {};
         if (updates.ToGoKM != null) fuelUpdates.remainingKM = updates.ToGoKM;
-        if (updates.ToKM != null) fuelUpdates.endKM = updates.ToKM;
+        if (updates.EndKM != null) fuelUpdates.endKM = updates.EndKM;
         if (Object.keys(fuelUpdates).length > 0) {
+          const newMileage = calcFuelMileage({ ...fuelEntry, ...fuelUpdates });
+          if (newMileage != null) fuelUpdates.mileage = newMileage;
           await updateEntry(db, tableFor('Sheet1'), merged.Fuel_Id, fuelUpdates, userId);
+          if (newMileage != null) {
+            await updateEntry(db, table, id, { Mileage: newMileage }, userId);
+            merged.Mileage = newMileage;
+          }
         }
       }
     }

@@ -1184,7 +1184,6 @@ function openEditTrip(id) {
   const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
   const distance = parseFloat(trip.Distance || trip.distance) || 0;
   const toGoKM = parseFloat(trip.ToGoKM || trip.toGoKM) || 0;
-  const toKM = parseFloat(trip.ToKM || trip.toKM) || 0;
   const tripDate = trip.Date || trip.date || '';
   const notes = trip.Notes || trip.notes || '';
 
@@ -1198,7 +1197,6 @@ function openEditTrip(id) {
   // For toGoKM: only use empty string if it's actually 0, otherwise show the value
   document.getElementById('trip_toGoKM').value = toGoKM > 0 ? toGoKM : '';
   document.getElementById('trip_toGoKM')._userEdited = true;
-  document.getElementById('trip_toKM').value = toKM > 0 ? toKM : '';
   console.log('✏️ Edit mode - toGoKM value:', toGoKM, '| Field set to:', document.getElementById('trip_toGoKM').value);
   const diff = trip.Diff !== undefined && trip.Diff !== null && trip.Diff !== '' ? trip.Diff : (trip.diff !== undefined && trip.diff !== null && trip.diff !== '' ? trip.diff : '');
   document.getElementById('trip_diff').value = diff;
@@ -1225,7 +1223,6 @@ function resetTripForm() {
   populateTripFuelSelect('');
   document.getElementById('trip_toGoKM').value = '';
   document.getElementById('trip_toGoKM')._userEdited = false;
-  document.getElementById('trip_toKM').value = '';
   document.getElementById('trip_diff').value = '';
   document.getElementById('trip_category').value = '';
 }
@@ -1247,6 +1244,15 @@ function calcTripDistance() {
   }
 }
 
+// A trip save can update the linked fuel entry's odometer/mileage via the
+// backend sync (see worker/index.js) — refresh the fuel entries table too,
+// otherwise its displayed mileage stays stale until the next full reload.
+async function refreshFuelEntries() {
+  data = await loadDataFromAPI();
+  saveToHistory();
+  render();
+}
+
 // Save Trip Entry
 async function saveTripEntry(e) {
   if (e) e.preventDefault();
@@ -1258,8 +1264,6 @@ async function saveTripEntry(e) {
   const distance = parseFloat(document.getElementById('trip_distance').value);
   const toGoKMValue = document.getElementById('trip_toGoKM').value.trim();
   const toGoKM = toGoKMValue !== '' ? parseFloat(toGoKMValue) : null;
-  const toKMValue = document.getElementById('trip_toKM').value.trim();
-  const toKM = toKMValue !== '' ? parseFloat(toKMValue) : null;
   const diffValue = document.getElementById('trip_diff').value.trim();
   const diff = diffValue !== '' ? parseFloat(diffValue) : null;
   const category = document.getElementById('trip_category').value.trim();
@@ -1299,10 +1303,6 @@ async function saveTripEntry(e) {
         updates.ToGoKM = toGoKM;
         console.log('✏️ Updating ToGoKM:', toGoKM);
       }
-      if (toKM !== null) {
-        updates.ToKM = toKM;
-        console.log('✏️ Updating ToKM:', toKM);
-      }
       if (diff !== null) {
         updates.Diff = diff;
         console.log('✏️ Updating Diff:', diff);
@@ -1313,6 +1313,7 @@ async function saveTripEntry(e) {
         closeTripModal();
         showToast('✓ Trip updated', 'success');
         loadTrips();
+        refreshFuelEntries();
       } else {
         showToast('❌ Failed to update trip: ' + result.error, 'error');
       }
@@ -1326,7 +1327,6 @@ async function saveTripEntry(e) {
         EndKM: endKM,
         Distance: distance,
         ToGoKM: toGoKM,
-        ToKM: toKM,
         Diff: diff,
         Notes: notes,
         Mileage: tripMileage,
@@ -1339,6 +1339,7 @@ async function saveTripEntry(e) {
         closeTripModal();
         showToast('✓ Trip added', 'success');
         loadTrips();
+        refreshFuelEntries();
       } else {
         showToast('❌ Failed to save trip: ' + result.error, 'error');
       }
