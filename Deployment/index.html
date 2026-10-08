@@ -134,6 +134,11 @@
     .field input, .field select { padding: 10px 10px; border: 1.5px solid var(--border); border-radius: 7px; font-size: 16px; color: var(--text); background: var(--card); outline: none; transition: border-color 0.15s, box-shadow 0.15s; -webkit-appearance: none; appearance: none; -webkit-border-radius: 7px; }
     .field input:focus, .field select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
     .field .helper { font-size: 0.62rem; color: var(--text-light); }
+    .checkbox-field { flex-direction: row; align-items: center; }
+    .checkbox-field label { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.85rem; font-weight: 600; color: var(--text); cursor: pointer; letter-spacing: normal; }
+    .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--success); cursor: pointer; }
+    tbody tr.row-full-tank { background: var(--success-light); border-left: 3px solid var(--success); }
+    tbody tr.row-full-tank:hover { background: var(--success-light); filter: brightness(0.96); }
     .divider { grid-column: 1/-1; border: none; border-top: 1px dashed var(--border); margin: 2px 0; }
     .section-lbl { grid-column: 1/-1; font-size: 0.66rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--primary); display: flex; align-items: center; gap: 6px; }
     .section-lbl::after { content: ""; flex: 1; border-top: 1px solid var(--primary-light); }
@@ -523,6 +528,10 @@
               <div class="cv" id="qtyDisplay">Enter amount and rate</div>
             </div>
             <input type="hidden" id="f_qty" />
+          </div>
+
+          <div class="field checkbox-field field-2x">
+            <label><input type="checkbox" id="f_fullTank" /> &#9981; Full Tank (complete fill-up)</label>
           </div>
 
           <hr class="divider" />

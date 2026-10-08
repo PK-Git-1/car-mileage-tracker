@@ -320,7 +320,7 @@ function renderTable() {
           : mil >= 8 ? `<span class="badge badge-amber">${fmtN(mil, 2)}</span>`
             : `<span class="badge badge-red">${fmtN(mil, 2)}</span>`;
 
-    return `<tr>
+    return `<tr class="${r.isFullTank ? 'row-full-tank' : ''}">
       <td data-label="Petrol Bunk"><div class="bunk-cell" title="${r.bunk}">${r.bunk}</div></td>
       <td data-label="Date">${fmtDate(r.date)}</td>
       <td class="num" data-label="From KM">${fmtI(r.startKM)}</td>
@@ -600,6 +600,7 @@ function openEdit(id) {
   document.getElementById('f_incomingKM').value = r.incomingKM ?? '';
   document.getElementById('f_remainKM').value = r.remainingKM ?? '';
   document.getElementById('f_projected').value = r.projected ?? '';
+  document.getElementById('f_fullTank').checked = !!r.isFullTank;
 
   calcAll();
   calcMileageEdit();
@@ -761,6 +762,7 @@ async function saveFormData() {
     fuelRate: parseFloat(document.getElementById('f_rate').value) || null,
     fuelQty: parseFloat(document.getElementById('f_qty').value) || null,
     projected: parseFloat(document.getElementById('f_projected').value) || null,
+    isFullTank: document.getElementById('f_fullTank').checked ? 1 : 0,
     vehicle_id: currentVehicleId,
   };
 

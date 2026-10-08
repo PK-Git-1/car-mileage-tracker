@@ -9,7 +9,7 @@
 // All /api/data requests require a Bearer session token (see /api/auth/* below) and
 // are scoped to the authenticated user's own rows via user_id.
 
-const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id', 'vehicle_id'];
+const FUEL_COLUMNS = ['id', 'bunk', 'date', 'startKM', 'endKM', 'incomingKM', 'remainingKM', 'fuelAmount', 'fuelRate', 'fuelQty', 'projected', 'mileage', 'user_id', 'vehicle_id', 'isFullTank'];
 const TRIP_COLUMNS = ['id', 'Fuel_Id', 'Date', 'StartKM', 'EndKM', 'Distance', 'ToGoKM', 'ToKM', 'Diff', 'Notes', 'Mileage', 'Category', 'user_id', 'vehicle_id', 'FuelConsumed'];
 const VEHICLE_COLUMNS = ['id', 'user_id', 'name', 'model', 'plate', 'isArchived', 'created_at', 'updated_at'];
 
@@ -143,6 +143,13 @@ const MIGRATIONS = [
       `CREATE INDEX IF NOT EXISTS idx_fuel_entries_user_id ON fuel_entries(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_trips_user_id ON trips(user_id)`,
       `CREATE INDEX IF NOT EXISTS idx_vehicles_user_id ON vehicles(user_id)`,
+    ],
+  },
+  {
+    version: '20261008000001',
+    description: 'add_full_tank_flag_to_fuel_entries',
+    statements: [
+      `ALTER TABLE fuel_entries ADD COLUMN isFullTank BOOLEAN DEFAULT 0`,
     ],
   },
 ];
