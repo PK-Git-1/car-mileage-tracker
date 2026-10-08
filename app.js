@@ -1970,7 +1970,6 @@ async function showApp(username) {
   document.getElementById('mainContent').style.display = 'block';
   document.getElementById('tripContent').style.display = 'none';
   currentView = 'home';
-  initializeVehicles();
   initializeData();
   loadTrips();
 }

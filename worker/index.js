@@ -137,6 +137,16 @@ const MIGRATIONS = [
   },
 ];
 
+// Cached per isolate so a fresh deploy still verifies, but subsequent requests
+// on an already-warm isolate skip the 2 extra D1 round trips this check costs.
+let migrationsVerified = false;
+
+async function ensureMigrations(db) {
+  if (migrationsVerified) return;
+  await runMigrations(db);
+  migrationsVerified = true;
+}
+
 async function runMigrations(db) {
   await db.prepare(`
     CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -585,7 +595,7 @@ export default {
     const url = new URL(request.url);
 
     try {
-      await runMigrations(env.DB);
+      await ensureMigrations(env.DB);
     } catch (err) {
       console.error('Auto-migration failed (non-blocking):', err.message);
     }
