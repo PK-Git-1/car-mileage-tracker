@@ -135,6 +135,16 @@ const MIGRATIONS = [
       `ALTER TABLE trips ADD COLUMN ToKM REAL`,
     ],
   },
+  {
+    version: '20261008000000',
+    description: 'add_user_id_indexes',
+    statements: [
+      // Every list/get query filters by user_id; without these, each one is a full table scan.
+      `CREATE INDEX IF NOT EXISTS idx_fuel_entries_user_id ON fuel_entries(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_trips_user_id ON trips(user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_vehicles_user_id ON vehicles(user_id)`,
+    ],
+  },
 ];
 
 // Cached per isolate so a fresh deploy still verifies, but subsequent requests

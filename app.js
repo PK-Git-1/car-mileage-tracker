@@ -110,33 +110,35 @@ async function authRequest(path, payload) {
   return await response.json();
 }
 
-// Load all data from Google Sheets
+// Fetch + normalize all fuel entries, without filtering by vehicle (callers apply that
+// themselves, since currentVehicleId may still be resolving in parallel on initial load).
+async function fetchNormalizedEntries() {
+  const result = await callAppsScript('get');
+  if (!result.success) throw new Error(result.error || 'Failed to load data');
+  let json = result.data || [];
+
+  if (Array.isArray(json)) {
+    json = json.map(entry => {
+      if (entry.date) {
+        const original = entry.date;
+        entry.date = normalizeDateString(entry.date);
+        console.log(`📅 Date normalized: "${original}" → "${entry.date}"`);
+      }
+      return entry;
+    });
+  }
+
+  return Array.isArray(json) ? json : [];
+}
+
+// Load all data from Google Sheets, filtered to the current vehicle
 async function loadDataFromAPI() {
   try {
     console.log(`📡 Fetching data for vehicle: ${currentVehicleId}`);
-    const result = await callAppsScript('get');
-    if (result.success) {
-      let json = result.data || [];
-
-      // Filter entries by current vehicle
-      json = json.filter(entry => entry.vehicle_id === currentVehicleId || !entry.vehicle_id);
-      console.log('✓ Data loaded:', json.length, 'entries');
-
-      // Normalize date format for all entries and fix timezone issues
-      if (Array.isArray(json)) {
-        json = json.map(entry => {
-          if (entry.date) {
-            const original = entry.date;
-            entry.date = normalizeDateString(entry.date);
-            console.log(`📅 Date normalized: "${original}" → "${entry.date}"`);
-          }
-          return entry;
-        });
-      }
-
-      return Array.isArray(json) ? json : [];
-    }
-    throw new Error(result.error || 'Failed to load data');
+    const json = await fetchNormalizedEntries();
+    const filtered = json.filter(entry => entry.vehicle_id === currentVehicleId || !entry.vehicle_id);
+    console.log('✓ Data loaded:', filtered.length, 'entries');
+    return filtered;
   } catch (err) {
     console.error('❌ Error loading data:', err.message);
     showToast('⚠️ Failed to load data. Check connection.', 'error');
@@ -237,8 +239,17 @@ async function initializeData() {
     '<p style="color:var(--text-muted);font-size:0.85rem;">Loading data…</p>' +
     '</div></td></tr>';
 
-  await initializeVehicles();
-  data = await loadDataFromAPI();
+  // Vehicle resolution and the fuel-entry fetch are independent network calls — run them
+  // concurrently, then apply the vehicle filter once currentVehicleId has settled.
+  let rawEntries;
+  try {
+    [, rawEntries] = await Promise.all([initializeVehicles(), fetchNormalizedEntries()]);
+  } catch (err) {
+    console.error('❌ Error loading data:', err.message);
+    showToast('⚠️ Failed to load data. Check connection.', 'error');
+    rawEntries = [];
+  }
+  data = rawEntries.filter(entry => entry.vehicle_id === currentVehicleId || !entry.vehicle_id);
   console.log(`Loaded ${data.length} entries`);
   saveToHistory();
   render();
@@ -819,14 +830,16 @@ let vehicleEditId = null;
 
 async function initializeVehicles() {
   try {
-    // Fetch vehicles from backend
-    const result = await callAppsScript('get', { sheet: 'Vehicles' });
+    // Vehicles list and the user profile are independent reads — fetch concurrently.
+    const [result, meResult] = await Promise.all([
+      callAppsScript('get', { sheet: 'Vehicles' }),
+      callAppsScript('me'),
+    ]);
     if (result.success) {
       vehicles = result.data.filter(v => !v.isArchived);
     }
 
     // Get current vehicle ID from user profile
-    const meResult = await callAppsScript('me');
     if (meResult.success && meResult.lastVehicleId) {
       currentVehicleId = meResult.lastVehicleId;
       // Verify it still exists and is not archived
