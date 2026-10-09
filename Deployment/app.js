@@ -1436,7 +1436,27 @@ function renderTrips() {
     return endB - endA;
   });
 
-  tbody.innerHTML = sortedTrips.map(trip => {
+  // Cluster trips by linked fuel entry (order of first appearance) so each fill-up forms one outlined group
+  const fuelKey = t => String(t.Fuel_Id ?? t.fuel_Id ?? '');
+  const groupOrder = [];
+  const groups = new Map();
+  sortedTrips.forEach(t => {
+    const k = fuelKey(t);
+    if (!groups.has(k)) { groups.set(k, []); groupOrder.push(k); }
+    groups.get(k).push(t);
+  });
+  const rowMeta = new Map();
+  groupOrder.forEach((k, gi) => {
+    const list = groups.get(k);
+    list.forEach((t, i) => rowMeta.set(t, {
+      cls: `grp ${gi % 2 === 0 ? 'grp-a' : 'grp-b'}${i === 0 ? ' grp-first' : ''}${i === list.length - 1 ? ' grp-last' : ''}`,
+      gi
+    }));
+  });
+  const orderedTrips = groupOrder.flatMap(k => groups.get(k));
+
+  tbody.innerHTML = orderedTrips.map(trip => {
+    const meta = rowMeta.get(trip);
     // Handle both field name variations (capital and lowercase)
     const startKM = parseFloat(trip.StartKM || trip.startKM) || 0;
     const endKM = parseFloat(trip.EndKM || trip.endKM) || 0;
@@ -1449,7 +1469,7 @@ function renderTrips() {
     const tripMil = trip.Mileage ?? null;
 
     return `
-    <tr>
+    <tr class="${meta.cls}">
       <td data-label="Date">${tripDate ? new Date(tripDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</td>
       <td class="num" data-label="Start KM">${startKM.toLocaleString()}</td>
       <td class="num" data-label="End KM">${endKM.toLocaleString()}</td>

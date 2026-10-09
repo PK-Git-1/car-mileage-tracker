@@ -137,6 +137,20 @@
     .checkbox-field { flex-direction: row; align-items: center; }
     .checkbox-field label { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.85rem; font-weight: 600; color: var(--text); cursor: pointer; letter-spacing: normal; }
     .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: none; accent-color: var(--success); cursor: pointer; padding: 0; border: none; background: none; -webkit-appearance: checkbox; appearance: checkbox; }
+    /* Trip history: outline box per fuel entry (alternating blue / green) */
+    #tripTableBody tr.grp-a { --g: var(--primary); }
+    #tripTableBody tr.grp-b { --g: var(--success); }
+    #tripTableBody tr.grp { border-bottom: none; }
+    #tripTableBody tr.grp td { box-shadow: inset 0 0 0 0 var(--g); }
+    #tripTableBody tr.grp td:first-child { box-shadow: inset 3px 0 0 var(--g); }
+    #tripTableBody tr.grp td:last-child { box-shadow: inset -3px 0 0 var(--g); }
+    #tripTableBody tr.grp-first td { border-top: 3px solid var(--g); }
+    #tripTableBody tr.grp-last td { border-bottom: 3px solid var(--g); }
+    #tripTableBody tr.grp:not(.grp-first) td { border-top: 1px dashed var(--border); }
+    #tripTableBody tr.grp-a:hover { background: var(--primary-light); }
+    #tripTableBody tr.grp-b:hover { background: var(--success-light); }
+    #tripTableBody tr.grp-last + tr.grp-first td { border-top: 3px solid var(--g); }
+    #tripTableBody tr.grp-last td { border-bottom-width: 3px; }
     tbody tr.row-full-tank { background: var(--success-light); border-left: 3px solid var(--success); }
     tbody tr.row-full-tank:hover { background: var(--success-light); filter: brightness(0.96); }
     .divider { grid-column: 1/-1; border: none; border-top: 1px dashed var(--border); margin: 2px 0; }
