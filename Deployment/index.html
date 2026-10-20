@@ -137,6 +137,12 @@
     .checkbox-field { flex-direction: row; align-items: center; }
     .checkbox-field label { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.85rem; font-weight: 600; color: var(--text); cursor: pointer; letter-spacing: normal; }
     .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: none; accent-color: var(--success); cursor: pointer; padding: 0; border: none; background: none; -webkit-appearance: checkbox; appearance: checkbox; }
+    .filter-panel { display: none; position: fixed; top: 64px; right: 12px; width: min(340px, calc(100vw - 24px)); background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.25); padding: 14px 16px; z-index: 150; flex-direction: column; gap: 10px; }
+    .filter-panel.open { display: flex; }
+    .filter-panel-title { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; color: var(--primary); }
+    .filter-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: var(--text-muted); }
+    .filter-field input { padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text); }
+    .filter-actions { display: flex; justify-content: flex-end; gap: 8px; }
     body:not(.show-insights) #alertsContainer { display: none !important; }
     /* Trip history: outline box per fuel entry (alternating blue / green) */
     #tripTableBody tr.grp-a { --g: var(--primary); }
@@ -299,6 +305,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
         Add Entry
       </button>
+      <button class="btn btn-primary" id="filterToggleBtn" onclick="toggleFilterPanel(event)">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+        <span id="filterToggleLbl">Filter</span>
+      </button>
       <button class="btn btn-primary" id="insightsToggleBtn" onclick="toggleInsights()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>
         <span id="insightsToggleLbl">Insights</span>
@@ -334,6 +344,7 @@
     <button onclick="undo(); toggleMobileMenu();">↶ Undo</button>
     <button onclick="redo(); toggleMobileMenu();">↷ Redo</button>
     <button onclick="handleAddClick(); toggleMobileMenu();">➕ Add Entry</button>
+    <button onclick="toggleFilterPanel(event); toggleMobileMenu();">🔍 Filter</button>
     <button onclick="toggleInsights(); toggleMobileMenu();">💡 Insights</button>
     <button onclick="toggleAnalyticsView(); toggleMobileMenu();">📊 Analytics</button>
     <button onclick="toggleTripsView(); toggleMobileMenu();">📍 Trips</button>
@@ -341,6 +352,24 @@
     <button onclick="logout(); toggleMobileMenu();">🚪 Logout</button>
   </div>
 </header>
+
+<!-- Filter dropdown (opened from the header Filter button / mobile menu) -->
+<div id="filterPanel" class="filter-panel" onclick="event.stopPropagation()">
+  <div class="filter-panel-title">Filter Fuel Log</div>
+  <label class="filter-field">Petrol bunk
+    <input type="text" id="searchInput" placeholder="Search by bunk..." oninput="applyFilters()" />
+  </label>
+  <label class="filter-field">From
+    <input type="date" id="filterDateFrom" oninput="applyFilters()" />
+  </label>
+  <label class="filter-field">To
+    <input type="date" id="filterDateTo" oninput="applyFilters()" />
+  </label>
+  <div class="filter-actions">
+    <button class="btn btn-sm btn-cancel" onclick="clearFilters()">Clear Filters</button>
+    <button class="btn btn-sm btn-primary" onclick="closeFilterPanel()">Done</button>
+  </div>
+</div>
 
 <main id="mainContent" style="display: none;">
   <div class="summary-grid">
@@ -354,22 +383,6 @@
 
   <!-- ALERTS SECTION -->
   <div id="alertsContainer" style="display: none; margin-bottom: 18px;"></div>
-
-  <!-- SEARCH & FILTER SECTION -->
-  <div style="background: var(--card); padding: 12px 16px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 16px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
-    <input type="text" id="searchInput" placeholder="🔍 Search by bunk..." style="flex: 1; min-width: 200px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
-
-    <div style="display: flex; gap: 8px;">
-      <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
-        From: <input type="date" id="filterDateFrom" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
-      </label>
-      <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; color: var(--text-muted);">
-        To: <input type="date" id="filterDateTo" style="padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; font-size: 0.9rem; background: var(--card); color: var(--text);" oninput="applyFilters()" />
-      </label>
-    </div>
-
-    <button class="btn btn-sm btn-cancel" onclick="clearFilters()" style="white-space: nowrap;">Clear Filters</button>
-  </div>
 
   <div class="section-header">
     <div class="section-title">Fuel Log <span id="countLabel"></span></div>

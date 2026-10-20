@@ -276,6 +276,7 @@ function applyFilters() {
     return bunkMatch && dateMatch;
   });
 
+  updateFilterIndicator();
   renderTable();
 }
 
@@ -284,8 +285,34 @@ function clearFilters() {
   document.getElementById('filterDateFrom').value = '';
   document.getElementById('filterDateTo').value = '';
   filteredData = [...data];
+  updateFilterIndicator();
   renderTable();
 }
+
+/* ===================== FILTER DROPDOWN ===================== */
+
+function toggleFilterPanel(e) {
+  if (e) e.stopPropagation();
+  const panel = document.getElementById('filterPanel');
+  if (panel.classList.contains('open')) { closeFilterPanel(); return; }
+  panel.style.top = (document.querySelector('header').getBoundingClientRect().bottom + 6) + 'px';
+  panel.classList.add('open');
+}
+
+function closeFilterPanel() {
+  document.getElementById('filterPanel').classList.remove('open');
+}
+
+// Show how many filters are active on the header button
+function updateFilterIndicator() {
+  const active = ['searchInput', 'filterDateFrom', 'filterDateTo']
+    .filter(id => document.getElementById(id).value).length;
+  const lbl = document.getElementById('filterToggleLbl');
+  if (lbl) lbl.textContent = active ? `Filter (${active})` : 'Filter';
+}
+
+document.addEventListener('click', closeFilterPanel);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeFilterPanel(); });
 
 function renderTable() {
   const sorted = [...filteredData].sort((a, b) => {
