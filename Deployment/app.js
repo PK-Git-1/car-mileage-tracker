@@ -1059,12 +1059,23 @@ function closeVehicleForm() {
 
 /* ===================== MOBILE MENU ===================== */
 
-function toggleMobileMenu() {
+function toggleMobileMenu(e) {
+  if (e) e.stopPropagation();
   const menu = document.getElementById('mobileMenu');
   const btn = document.getElementById('hamburgerBtn');
   menu.classList.toggle('open');
   btn.classList.toggle('open');
 }
+
+function closeMobileMenu() {
+  document.getElementById('mobileMenu').classList.remove('open');
+  document.getElementById('hamburgerBtn').classList.remove('open');
+}
+
+// Close the menu after any item is chosen (capture so item handlers that stop propagation still work), or on outside click / Esc
+document.getElementById('mobileMenu').addEventListener('click', e => { if (e.target.closest('button')) closeMobileMenu(); }, true);
+document.addEventListener('click', closeMobileMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeMobileMenu(); });
 
 /* ===================== INSIGHTS TOGGLE ===================== */
 
@@ -1107,9 +1118,9 @@ function toggleDarkMode() {
 function updateDarkModeButton() {
   const btn = document.getElementById('darkModeBtn');
   if (document.body.classList.contains('dark-mode')) {
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="5"/><path d="M12 1v6m0 6v6M4.22 4.22l4.24 4.24m3.08 3.08l4.24 4.24M1 12h6m6 0h6M4.22 19.78l4.24-4.24m3.08-3.08l4.24-4.24"/></svg>Light Mode';
   } else {
-    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>';
+    btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>Dark Mode';
   }
 }
 
