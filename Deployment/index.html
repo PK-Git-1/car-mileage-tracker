@@ -137,6 +137,7 @@
     .checkbox-field { flex-direction: row; align-items: center; }
     .checkbox-field label { display: flex; align-items: center; gap: 8px; text-transform: none; font-size: 0.85rem; font-weight: 600; color: var(--text); cursor: pointer; letter-spacing: normal; }
     .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: none; accent-color: var(--success); cursor: pointer; padding: 0; border: none; background: none; -webkit-appearance: checkbox; appearance: checkbox; }
+    body:not(.show-insights) #alertsContainer { display: none !important; }
     /* Trip history: outline box per fuel entry (alternating blue / green) */
     #tripTableBody tr.grp-a { --g: var(--primary); }
     #tripTableBody tr.grp-b { --g: var(--success); }
@@ -298,6 +299,10 @@
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
         Add Entry
       </button>
+      <button class="btn btn-primary" id="insightsToggleBtn" onclick="toggleInsights()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 00-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0012 2z"/></svg>
+        <span id="insightsToggleLbl">Insights</span>
+      </button>
       <button class="btn btn-primary" id="analyticsToggleBtn" onclick="toggleAnalyticsView()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 3v18a2 2 0 002 2h16V3"/><path d="M7 12h4M15 8h4M11 16h8M3 8h2M3 12h2M3 16h2"/></svg>
         Analytics
@@ -329,6 +334,7 @@
     <button onclick="undo(); toggleMobileMenu();">↶ Undo</button>
     <button onclick="redo(); toggleMobileMenu();">↷ Redo</button>
     <button onclick="handleAddClick(); toggleMobileMenu();">➕ Add Entry</button>
+    <button onclick="toggleInsights(); toggleMobileMenu();">💡 Insights</button>
     <button onclick="toggleAnalyticsView(); toggleMobileMenu();">📊 Analytics</button>
     <button onclick="toggleTripsView(); toggleMobileMenu();">📍 Trips</button>
     <button onclick="toggleDarkMode(); toggleMobileMenu();">🌙 Dark Mode</button>

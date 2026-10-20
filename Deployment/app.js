@@ -1039,6 +1039,27 @@ function toggleMobileMenu() {
   btn.classList.toggle('open');
 }
 
+/* ===================== INSIGHTS TOGGLE ===================== */
+
+// Insights/alerts panel is hidden by default (CSS) and shown when body has .show-insights
+function initializeInsights() {
+  let on = false;
+  try { on = localStorage.getItem('showInsights') === 'true'; } catch (e) {}
+  document.body.classList.toggle('show-insights', on);
+  updateInsightsButton();
+}
+
+function toggleInsights() {
+  const on = document.body.classList.toggle('show-insights');
+  try { localStorage.setItem('showInsights', on); } catch (e) {}
+  updateInsightsButton();
+}
+
+function updateInsightsButton() {
+  const lbl = document.getElementById('insightsToggleLbl');
+  if (lbl) lbl.textContent = document.body.classList.contains('show-insights') ? 'Hide Insights' : 'Insights';
+}
+
 /* ===================== DARK MODE ===================== */
 
 function initializeDarkMode() {
@@ -2075,6 +2096,7 @@ function logout() {
 /* ===================== INIT ===================== */
 document.addEventListener('DOMContentLoaded', async () => {
   initializeDarkMode();
+  initializeInsights();
   // Auto-login if a stored session token is still valid server-side
   const token = getAuthToken();
   let autoLoggedIn = false;
