@@ -53,13 +53,15 @@ async function callAppsScript(action, payload = {}) {
 
     const url = new URL(APPS_SCRIPT_URL, window.location.origin);
     url.searchParams.append('action', action);
+    // The Worker reads the target table from the query string for every action,
+    // so POSTs (add/update/delete) must send it there too, not only in the body.
+    if (payload.sheet) url.searchParams.append('sheet', payload.sheet);
 
     let options;
 
     if (action.startsWith('get')) {
       options = { method: 'GET', headers: authHeaders };
       if (payload.id) url.searchParams.append('id', payload.id);
-      if (payload.sheet) url.searchParams.append('sheet', payload.sheet);
     } else {
       options = {
         method: 'POST',
